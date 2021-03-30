@@ -35,7 +35,7 @@ public class AttentionPair : MonoBehaviour
     {
         CurrentAnswered = CurrentAnswered+1;
         OnAnswered.Invoke();
-        Debug.Log($"Отличий найдено: {currentAnswered}");
+
     }
 
     // Start is called before the first frame update
@@ -66,9 +66,4 @@ public class AttentionPair : MonoBehaviour
         }
     }
 
-    // Update is called once per frame
-    void Update()
-    {
-
-    }
 }

@@ -1,9 +1,13 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+[RequireComponent(typeof(CharacterController))]
 public class PlayerController : MonoBehaviour
 {
+    [Header("Пушка")]
+    public Gun gun;
 
     [Header("Скорость перемещения")]
     [Range(1, 9)]
@@ -20,18 +24,21 @@ public class PlayerController : MonoBehaviour
 
     private float rotationX;
     private Transform eyes;
+    private Camera mainCam;
     private CharacterController controller;
 
     private GameMenu gameMenu;
+    public event Action<bool> OnRunStateChange;
+    public bool IsRun { get; set; }
+
 
     // Start is called before the first frame update
     void Start()
     {
         gameMenu = UIController.GetMenu<GameMenu>();
-        eyes = Camera.main.transform;
-
-        controller = gameObject.AddComponent<CharacterController>();
-
+        mainCam = Camera.main;
+        eyes = mainCam.transform.parent;
+        controller = GetComponent<CharacterController>();
     }
 
     public void CameraLogic()
@@ -40,17 +47,32 @@ public class PlayerController : MonoBehaviour
         rotationX -= Input.GetAxis("Mouse Y") * sensitivity;
         rotationX = Mathf.Clamp(rotationX, minLook, maxLook);
         float delta = Input.GetAxis("Mouse X") * sensitivity;
-        float rotationY = transform.localEulerAngles.y + delta;
-        transform.localEulerAngles = new Vector3(rotationX, rotationY, 0);
+        float rotationY = eyes.localEulerAngles.y + delta;
+        eyes.localEulerAngles = new Vector3(rotationX, rotationY, 0);
 
     }
+
+    internal void ShootLogic()
+    {
+        var ray = mainCam.ScreenPointToRay(Input.mousePosition);
+        var hits = Physics.RaycastAll(ray);
+        Vector3 target = hits != null ? hits[0].point : ray.direction * 100;
+        gun.Shoot(target);
+    }
+
     public void MoveLogic()
     {
 
         Vector3 frontBackMove = new Vector3(eyes.forward.x, 0, eyes.forward.z);
         Vector3 leftRightMove = new Vector3(frontBackMove.z, 0, -frontBackMove.x);
-        controller.Move(frontBackMove * Input.GetAxis("Vertical") * Time.fixedDeltaTime * speed);
-        controller.Move(leftRightMove * Input.GetAxis("Horizontal") * Time.fixedDeltaTime * speed);
+
+        Vector2 axis = new Vector2(Input.GetAxis("Vertical"), Input.GetAxis("Horizontal"));
+        IsRun = axis.magnitude > 0.0001f;
+        gun.RunLogic(IsRun);
+        var deltaTime = Time.fixedDeltaTime;
+        controller.Move(frontBackMove * axis.x * deltaTime * speed);
+        controller.Move(leftRightMove * axis.y * deltaTime * speed);
     }
+
 
 }

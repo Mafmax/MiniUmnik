@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 public class PlatformController : MonoBehaviour
@@ -8,6 +9,8 @@ public class PlatformController : MonoBehaviour
     private Transform platform;
     [Header("Экземпляр кубика")]
     public GameObject BlockExample;
+    private bool layerFallen = false;
+    public bool breaked;
     private void AddCubes(bool[,,] blocks, float offsetTop)
     {
         int len = blocks.GetLength(0);
@@ -49,7 +52,6 @@ public class PlatformController : MonoBehaviour
     public IEnumerator AddCubesCoroutine(bool[,,] blocks, float offsetTop, float layerAnimationTime, Color[] colors)
     {
         AddCubes(blocks, offsetTop);
-
         for (int i = 0; i < cubeLayers.Count; i++)
         {
             for (int j = 0; j < cubeLayers[i].Length; j++)
@@ -64,8 +66,9 @@ public class PlatformController : MonoBehaviour
         for (int i = 0; i < cubeLayers.Count; i++)
         {
             var layer = cubeLayers[i];
-            if (layer != null && layer.Length > 0)
+            if (layer != null && layer.Where(x => x != null).Any())
             {
+                layerFallen = true;
                 foreach (var cube in layer)
                 {
                     if (cube != null)
@@ -74,10 +77,9 @@ public class PlatformController : MonoBehaviour
                     }
                 }
 
-                yield return new WaitForSeconds(layerAnimationTime);
+                yield return new WaitWhile(() => layerFallen);
             }
         }
-        yield break;
     }
     private IEnumerator MoveCoroutine(Transform obj, float time, Vector3 moveVector)
     {
@@ -90,15 +92,24 @@ public class PlatformController : MonoBehaviour
         {
 
             counter++;
-            obj.position = startPos + moveStep * counter;
+            if (obj != null)
+            {
+                obj.position = startPos + moveStep * counter;
+
+            }
             yield return new WaitForSeconds(timeStep);
             if (counter > steps)
             {
                 break;
             }
         }
-        obj.position = startPos + moveVector;
-        yield break;
+        if (obj != null)
+        {
+
+            obj.position = startPos + moveVector;
+        }
+        layerFallen = false;
+
     }
     public void DeleteCubes()
     {
@@ -108,7 +119,6 @@ public class PlatformController : MonoBehaviour
             {
                 if (cubeLayers[i][j] != null)
                 {
-
                     Destroy(cubeLayers[i][j].gameObject);
                 }
             }
@@ -123,6 +133,12 @@ public class PlatformController : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        if (breaked)
+        {
 
+            StopAllCoroutines();
+            DeleteCubes();
+            breaked = false;
+        }
     }
 }

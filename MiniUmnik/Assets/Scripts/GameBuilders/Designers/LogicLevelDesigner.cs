@@ -6,7 +6,7 @@ using System.Linq;
 public class LogicLevelDesigner : LevelDesigner
 {
 
-    private static int BoxesEndLevel = 3;
+    private static int BoxesEndLevel = 10;
     private bool[,,] cubes;
     private Color[] colors = new Color[4];
     private GameObject cube;
@@ -34,6 +34,7 @@ public class LogicLevelDesigner : LevelDesigner
             cubes = new bool[size, size, size];
             switch (currentLevel)
             {
+                // верх, право, перед
 
                 case 0:
                     cubes[1, 1, 2] = true;
@@ -44,6 +45,7 @@ public class LogicLevelDesigner : LevelDesigner
                     cubes[1, 0, 0] = true;
                     cubes[1, 1, 1] = true;
                     cubes[0, 1, 1] = true;
+                    cubes[0, 1, 0] = true;
                     break;
                 case 2:
 
@@ -51,6 +53,82 @@ public class LogicLevelDesigner : LevelDesigner
                     cubes[1, 1, 1] = true;
                     cubes[0, 1, 1] = true;
                     cubes[2, 1, 2] = true;
+                    cubes[1, 0, 0] = true;
+                    break;
+                case 3:
+
+                    cubes[1, 0, 0] = true;
+                    cubes[1, 1, 1] = true;
+                    cubes[0, 1, 1] = true;
+                    cubes[2, 1, 2] = true;
+                    cubes[1, 0, 0] = true;
+                    cubes[2, 2, 2] = true;
+                    break;
+                case 4:
+
+                    cubes[1, 0, 0] = true;
+                    cubes[1, 1, 1] = true;
+                    cubes[0, 1, 1] = true;
+                    cubes[2, 1, 2] = true;
+                    cubes[2, 0, 0] = true;
+                    break;
+                case 5:
+
+                    cubes[1, 0, 0] = true;
+                    cubes[1, 1, 1] = true;
+                    cubes[0, 1, 1] = true;
+                    cubes[2, 1, 2] = true;
+                    cubes[1, 1, 0] = true;
+                    cubes[1, 0, 2] = true;
+                    cubes[1, 2, 0] = true;
+                    break;
+                case 6:
+
+                    cubes[1, 0, 0] = true;
+                    cubes[1, 1, 1] = true;
+                    cubes[0, 1, 1] = true;
+                    cubes[2, 1, 2] = true;
+                    cubes[1, 1, 0] = true;
+                    cubes[1, 0, 2] = true;
+                    cubes[1, 2, 0] = true;
+                    cubes[1, 2, 2] = true;
+                    break;
+                case 7:
+
+                    cubes[1, 0, 0] = true;
+                    cubes[1, 1, 1] = true;
+                    cubes[0, 1, 1] = true;
+                    cubes[2, 1, 2] = true;
+                    cubes[1, 1, 0] = true;
+                    cubes[1, 0, 2] = true;
+                    cubes[1, 2, 0] = true;
+                    cubes[1, 2, 2] = true;
+                    cubes[1, 2, 1] = true;
+                    break;
+                case 8:
+
+                    cubes[1, 0, 0] = true;
+                    cubes[1, 1, 1] = true;
+                    cubes[0, 1, 1] = true;
+                    cubes[2, 1, 2] = true;
+                    cubes[1, 1, 0] = true;
+                    cubes[1, 0, 2] = true;
+                    cubes[1, 2, 0] = true;
+                    cubes[1, 2, 2] = true;
+                    cubes[0, 0, 0] = true;
+                    break;
+                case 9:
+
+                    cubes[1, 0, 0] = true;
+                    cubes[1, 1, 1] = true;
+                    cubes[0, 1, 1] = true;
+                    cubes[2, 1, 2] = true;
+                    cubes[1, 1, 0] = true;
+                    cubes[1, 0, 2] = true;
+                    cubes[1, 2, 0] = true;
+                    cubes[1, 2, 2] = true;
+                    cubes[0, 0, 0] = true;
+                    cubes[0, 1, 0] = true;
                     break;
             }
 
@@ -60,42 +138,37 @@ public class LogicLevelDesigner : LevelDesigner
 
     public override IEnumerator CreateLevel(int level)
     {
-       
+
         answerRecieved = false;
         currentLevel = level;
-        if (currentLevel < 3)
-        {
 
-            ConstructCubes();
-            yield return StartCoroutine(platform.AddCubesCoroutine(cubes, 20, 0.5f, colors));
-            yield return new WaitForSeconds(2);
-            yield return StartCoroutine(CreateAnswersCoroutine());
-           
-        }
+        ConstructCubes();
+        yield return StartCoroutine(platform.AddCubesCoroutine(cubes, 20, 0.5f, colors));
+       
+        yield return StartCoroutine(CreateAnswersCoroutine());
 
-        Debug.Log("уровень начался");
-        yield break;
+
+
+
     }
 
     public override IEnumerator RemoveLevel()
     {
-        yield return new WaitForSeconds(2);
+
         question.text = "";
-        platform.DeleteCubes();
+        platform.breaked = true;
         for (int i = 0; i < answers.Count; i++)
         {
-            Destroy(answers[i].gameObject);
+            if (answers[i] != null)
+            {
+
+                Destroy(answers[i].gameObject);
+            }
         }
+        StopAllCoroutines();
         yield break;
     }
 
-    public override IEnumerator WaitAnswer()
-    {
-        while (!answerRecieved)
-        {
-            yield return null;
-        }
-    }
 
     private Dictionary<string, string> ConfigureQuestions()
     {
@@ -110,60 +183,54 @@ public class LogicLevelDesigner : LevelDesigner
 
 
         answers.Clear();
+        float time = 0.0f;
 
-        if (currentLevel < 3)
+        if (currentLevel < 4)
         {
-
-            List<KeyValuePair<string, string>> materialQuestion = ConfigureQuestions().ToList();
-            int qCount = materialQuestion.Count;
-            var randomIndex = UnityEngine.Random.Range(0, qCount);
-            string rightAnswer = materialQuestion.Where(x => x.Key == materialQuestion[randomIndex].Key).FirstOrDefault().Key;
-            question.color = Color.blue;
-            question.fontSize = 25;
-            question.text = materialQuestion.Where(x => x.Key == rightAnswer).FirstOrDefault().Value;
-            while (materialQuestion.Count > 0)
-            {
-
-                var answer = Instantiate(answerExample);
-                int rnd = UnityEngine.Random.Range(0, materialQuestion.Count);
-                var material = materialQuestion[rnd].Key;
-                if (material == rightAnswer)
-                {
-                    answer.IsCorrect = true;
-                }
-                answer.Create(OnChoice, material);
-                float PI = 3.14159f;
-                var angle = -PI / 2 + PI / qCount * (qCount - materialQuestion.Count + 0.5f);
-                var r = 6.0f;
-                var offset = new Vector3(-r * Mathf.Sin(angle), 0.5f, r * Mathf.Cos(angle));
-                answer.transform.position = answerAnchor.position + offset;
-                answer.transform.forward = -new Vector3(offset.x, 0, offset.z);
-                answers.Add(answer);
-                materialQuestion.RemoveAt(rnd);
-            }
-
-
+            time = 15;
         }
-
-
-        yield break;
-    }
-
-    private void OnChoice(Answer answer)
-    {
-        answerRecieved = true;
-            question.fontSize= 50;
-        if (answer.IsCorrect)
+        else if (currentLevel < 8)
         {
-            question.color = Color.green;
-            question.text = "ПРАВИЛЬНО :)";
+            time = 12;
         }
         else
         {
-            question.color = Color.red;
-            question.text = "НЕ ПРАВИЛЬНО :(";
-
+            time = 10;
         }
-        Debug.Log($"Ответ правильный: {answer.IsCorrect}");
+
+
+        List<KeyValuePair<string, string>> materialQuestion = ConfigureQuestions().ToList();
+        int qCount = materialQuestion.Count;
+        var randomIndex = UnityEngine.Random.Range(0, qCount);
+        string rightAnswer = materialQuestion.Where(x => x.Key == materialQuestion[randomIndex].Key).FirstOrDefault().Key;
+        question.color = Color.blue;
+        question.fontSize = 25;
+        question.text = materialQuestion.Where(x => x.Key == rightAnswer).FirstOrDefault().Value;
+        while (materialQuestion.Count > 0)
+        {
+
+            var answer = Instantiate(answerPicExample);
+            int rnd = UnityEngine.Random.Range(0, materialQuestion.Count);
+            var material = materialQuestion[rnd].Key;
+            if (material == rightAnswer)
+            {
+                answer.IsCorrect = true;
+            }
+            answer.Create(OnChoice, material);
+            answers.Add(answer);
+            materialQuestion.RemoveAt(rnd);
+        }
+
+        PlaceAnswers();
+        StartTimer(time);
+        yield break;
+    }
+
+
+    private void OnChoice(Answer answer)
+    {
+        bool completed = answer.IsCorrect;
+        string data = completed ? $"Решено верно" : "Ошибка";
+        SendStatistics(completed, data);
     }
 }

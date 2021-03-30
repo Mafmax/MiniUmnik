@@ -19,9 +19,13 @@ public class AttentionDifference : MonoBehaviour
         }
     }
 
-    private void OnMouseDown()
+    private void OnCollisionEnter(Collision collision)
     {
-        Open();
+        if (collision.transform.TryGetComponent<Bullet>(out var plug))
+        {
+            Open();
+            Destroy(collision.gameObject);
+        }
     }
     // Start is called before the first frame update
     void Start()
@@ -35,8 +39,4 @@ public class AttentionDifference : MonoBehaviour
         Material.SetColor("_Color", new Color(Material.color.r, Material.color.g, Material.color.b, a));
     }
     // Update is called once per frame
-    void Update()
-    {
-
-    }
 }

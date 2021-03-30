@@ -40,8 +40,11 @@ public class StartMenu : Menu
     private void OnStartButtonClick()
     {
         gameMenu.OpenMenu(true);
-        Debug.LogWarning("Поменять");
-        gameBuilder.StartGame(GameType.Attention, 10);
+        gameBuilder.StartGame(gameType, 10);
+    }
+    public void RepeatGame()
+    {
+        OnStartButtonClick();
     }
 
     private void OnChoiceButtonClick()

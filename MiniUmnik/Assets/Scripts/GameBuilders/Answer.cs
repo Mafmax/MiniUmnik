@@ -7,41 +7,31 @@ using UnityEngine;
 public class Answer : MonoBehaviour
 {
     public bool IsCorrect = false;
-
     private event Action<Answer> OnChoice;
+    protected Transform answer;
+    protected Transform player;
 
-    private Transform screen;
-    private Transform answer;
-
-    private Transform player;
-
-    public void Create(Action<Answer> answerCallback, Material screenMaterial)
+    public  void Create(Action<Answer> answerCallback)
     {
-
         OnChoice += answerCallback;
-        var MRenderer = screen.GetChild(0).GetComponent<MeshRenderer>();
-        MRenderer.material = screenMaterial;
     }
-    public void Create(Action<Answer> answerCallback, string screenMaterialName)
-    {
-        var material = Resources.Load<Material>("Materials/" + screenMaterialName);
-        Create(answerCallback, material);
-    }
+
     // Start is called before the first frame update
-    void Awake()
+    protected virtual void Awake()
     {
-        screen = GetComponentsInChildren<Transform>().Where(x => x.name == "Screen").FirstOrDefault();
         player = FindObjectOfType<PlayerController>().transform;
         answer = transform;
     }
     // Update is called once per frame
-    void Update()
+
+    
+    private void OnCollisionStay(Collision collision)
     {
-        screen.forward = player.position - answer.position;
-    }
-    private void OnMouseDown()
-    {
-        SendAnswer();
+        if(collision.transform.TryGetComponent<Bullet>(out var plug))
+        {
+            SendAnswer();
+            Destroy(collision.gameObject);
+        }
     }
     private void SendAnswer()
     {

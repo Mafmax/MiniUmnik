@@ -10,7 +10,7 @@ public class UIController : MonoBehaviour
     private static Dictionary<string, Menu> menus = new Dictionary<string, Menu>();
     private Dictionary<string, Type> names = new Dictionary<string, Type>();
     public static UIController Controller { get; private set; }
-    public static T GetMenu<T>() where T:Menu
+    public static T GetMenu<T>() where T : Menu
     {
         var menu = menus.Values.Where(x => x.GetType() == typeof(T)).FirstOrDefault();
         if (menu == null)
@@ -24,10 +24,16 @@ public class UIController : MonoBehaviour
     private void InitiateNames()
     {
         Controller = this;
-        names.Add("Start", typeof(StartMenu));
-        names.Add("Game", typeof(GameMenu));
-        names.Add("Choice", typeof(ChoiceMenu));
+        AddMenu<StartMenu>();
+        AddMenu<GameMenu>();
+        AddMenu<ChoiceMenu>();
+        AddMenu<StatisticsMenu>();
 
+    }
+    
+    private void AddMenu<T>() where T: Menu
+    {
+        names.Add(typeof(T).Name.Replace("Menu", ""), typeof(T));
     }
     void Start()
     {
@@ -55,9 +61,9 @@ public class UIController : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        
+
     }
-   
+
     public static void CloseMenus()
     {
 

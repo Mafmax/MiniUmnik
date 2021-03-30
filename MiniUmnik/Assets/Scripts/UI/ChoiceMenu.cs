@@ -131,7 +131,7 @@ public class ChoiceMenu : Menu
     private void OnChoice()
     {
         choice = positions.Where(x => x.type.ToString() == EventSystem.current.currentSelectedGameObject.name).FirstOrDefault();
-        Debug.Log($"Выбранный режим: {choice.name}");
+
         var menu = UIController.GetMenu<StartMenu>();
         menu.gameType = choice.type;
         menu.OpenMenu(true);
