@@ -84,17 +84,17 @@ public class MemoryLevelDesigner : LevelDesigner
         float time = 0.0f;
         if (currentLevel < 4)
         {
-            time = 40;
+            time = 80;
             topology = new Texture[3, 2];
         }
         else if (currentLevel < 8)
         {
             topology = new Texture[4, 2];
-            time = 50;
+            time = 100;
         }
         else
         {
-            time = 70;
+            time = 140;
             topology = new Texture[4, 3];
         }
         FillTopology(topology);

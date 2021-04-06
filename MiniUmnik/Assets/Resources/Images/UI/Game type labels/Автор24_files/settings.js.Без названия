@@ -1,0 +1,752 @@
+var qualificationChangeBlock = (function () {
+	var self = {
+		_changeBlocks: {},
+		_ajaxLock: false,
+		_ajaxOn: false,
+		add: function (block) {
+			self._changeBlocks[block] = true;
+		},
+		remove: function (block) {
+			if (!!self._changeBlocks[block]) {
+				delete self._changeBlocks[block];
+			}
+		},
+		clear: function () {
+			self._changeBlocks = {};
+		},
+		isEmpty: function () {
+			return !(self._changeBlocks.length > 0);
+		},
+		getList: function () {
+			var buffer = [];
+			for (var i in self._changeBlocks) {
+				buffer.push(i);
+			}
+			return buffer;
+		},
+		ajaxSend: function () {
+			// запросы отправляются по очереди
+			self._ajaxOn = true;
+			// достаем первый блок в очереди
+			var blockId;
+			for (blockId in self._changeBlocks) {
+				break;
+			}
+
+			if (blockId) {
+				$('#' + blockId).find('.settings__saveButton').trigger('click');
+			} else if (self._ajaxOn) {
+				self._ajaxOn = false;
+				$('#send_line').hide();
+				$('#qualificationAllSaveButton').removeClass('gray').addClass('blue');
+			}
+		},
+		signalAjaxBefore: function (block) {
+			self._ajaxLock = true;
+		},
+		signalAjaxSuccess: function (block) {
+			self._ajaxLock = false;
+			self.remove(block);
+			if (self._ajaxOn) {
+				self.ajaxSend();
+			}
+		}
+	};
+	return self;
+})();
+/**
+ * Дизаблит поля формы после сохранения данных.
+ * К полю надо добавить [data-disable="afterSave"]
+ * @param form - контейнер в котором лежат отправленные поля
+ */
+var disableAfterSave = function (form) {
+    form.find('[name]').each(function (i, el) {
+        var $el = $(el);
+        if ($el.attr('data-disable') == 'afterSave' && $el.attr('value').toString() != $el.val().toString()) {
+            $el.attr('disabled', 'disabled');
+        }
+    });
+};
+
+$(document).ready(function () {
+    var lang = $('html').attr('lang');
+    //для стадибея нужна валидация,т.к. одна форма и все поля обязательные
+    var isStudybayvalidForm = false;
+    var nickNameTmp = $('[name="nick_name"]').val();
+    $('.withdraw__item').each(function(){
+        var mainBlock = $(this);
+
+        mainBlock.find('input:not([type="checkbox"]), textarea').each(function(){
+            $(this).on('change, keyup', function(){
+                enableToSave(mainBlock);
+            })
+        });
+
+        mainBlock.find('input[type="checkbox"], input[type="radio"], select').change(function(){
+            enableToSave(mainBlock);
+        })
+    });
+
+    $(document).on('click', '.settings__checkboxWrap', function(e) {
+        $(e.target).find('.radio').click();
+    });
+
+    if (location.href.indexOf("#") != -1){
+        var anchor = location.href.substring( location.href.indexOf("#") + 1);
+        if ( anchor !== '' ){
+            goToAnchor(anchor);
+        }
+    }
+
+
+    /*
+     $(":file").jfilestyle(
+     {
+     width: 100,
+     imageheight: 100,
+     imagewidth: 100,
+     image: 'assets/images/v1/dava.png'
+     }
+     );
+     */
+    var coord_x = 0;
+    var coord_y = 0;
+    var coord_w = 0;
+    var coord_h = 0;
+    var real_w = 0;
+    var real_h = 0;
+
+    $('#file').on("change", function(e){
+        $('#ava_error').html('');
+
+        var form = $(this).closest("form");
+        $('.avaprev').hide();
+        if (form.attr("id") == "avatar-form"){
+            form.ajaxSubmit({
+                async:false,
+                beforeSend: function () {
+                    // тут прячем блок с фото и показываем алоад
+                    $("#upload_name").html('<span>Имя:</span>' + $('#file')[0].value.split(/(\\|\/)/g).pop());
+                    $('.settings__avaButtonDiv').hide();
+                    $("#ava_loader").show();
+                },
+
+                uploadProgress: function (event, position, total, percentComplete) {
+                    // двигаем аплоад
+                    $("#upload_scroll").css("width", percentComplete + "%");
+                    $("#upload_percent").html(percentComplete + "%");
+
+                    //$("#upload_cnt").html(percentComplete);
+                },
+
+                success: function (data) {
+                    if (data['ok'] == "ok") {
+                        $('#ava_upload').hide();
+                        var userData = $('#userData');
+                        if (userData.data('groupid') == 2){
+                            $('#ava_bigava').html('<img  id="cropbox" style="width:600px;" src="'+ data['img_url'] + '" />');
+                        }else{
+                            $('#ava_bigava').html('<img  id="cropbox" src="'+ data['img_url'] + '" />');
+                        }
+
+                        $('#cropbox').Jcrop({
+                            onChange: updatePreview,
+                            aspectRatio: 1,
+                            minSize: [ 176, 176 ]
+                        },function(){
+                            var bounds = this.getBounds();
+                            boundx = bounds[0];
+                            boundy = bounds[1];
+                        });
+
+                        $('.jcrop-holder').click();
+
+                        $('#ava_change').show();
+
+                        var img = new Image();
+                        img.onload = function() {
+                            real_w = this.width;
+                            real_h = this.height;
+                        }
+                        img.src = $('#cropbox').prop('src');
+
+                    }
+                    else
+                    {
+                        if(data['error'])
+                        {
+                            $('.settings__avaButtonDiv').show();
+                            $('#ava_error').html(data['error']);
+                            $('#ava_loader').hide();
+                        }
+                    }
+                },
+
+                error: function (data){
+                    var error = 'Ошибка';
+                    if(data['statusText'] == 'Request Entity Too Large')
+                        error = $.i18n._('Слишком большой файл, ограничение 30Мб');
+                    $('.settings__avaButtonDiv').show();
+                    $('#ava_error').html(error);
+                    $('#ava_loader').hide();
+                }
+
+            });
+        }
+    })
+
+
+    var ava_crop = $('#ava_crop');
+
+    function updatePreview(c){
+        //var test = (parseFloat($('#cropbox').css('width')))/parseFloat(($('#cropbox')[0].width))
+
+        coord_x = c.x*real_w/parseInt($('#cropbox').css('width'));
+        coord_y = c.y*real_h/parseInt($('#cropbox').css('height'));
+        coord_w = c.w*real_w/parseInt($('#cropbox').css('width'));
+        coord_h = c.h*real_h/parseInt($('#cropbox').css('height'));
+
+        $('#ava_prev_big').attr('src', $('#cropbox').attr('src') );
+        $('#ava_prev_medium_1').attr('src', $('#cropbox').attr('src') );
+        $('#ava_prev_medium_2').attr('src', $('#cropbox').attr('src') );
+        /*$('#ava_prev_medium_3').attr('src', $('#cropbox').attr('src') );
+        $('#ava_prev_medium_4').attr('src', $('#cropbox').attr('src') );*/
+        $('#ava_prev_small_1').attr('src', $('#cropbox').attr('src') );
+        $('#ava_prev_small_2').attr('src', $('#cropbox').attr('src') );
+
+        var rx = 176 / c.w;
+        var ry = 176 / c.h;
+
+        $('#ava_prev_big').css({
+            width: Math.round(rx * parseInt($('#cropbox').css('width'))) + 'px',
+            height: Math.round(ry * parseInt($('#cropbox').css('height'))) + 'px',
+            marginLeft: '-' + Math.round(rx * c.x) + 'px',
+            marginTop: '-' + Math.round(ry * c.y) + 'px'
+        });
+
+        var rx = 50 / c.w;
+        var ry = 50 / c.h;
+
+        $('#ava_prev_medium_1').css({
+            width: Math.round(rx * parseInt($('#cropbox').css('width'))) + 'px',
+            height: Math.round(ry * parseInt($('#cropbox').css('height'))) + 'px',
+            marginLeft: '-' + Math.round(rx * c.x) + 'px',
+            marginTop: '-' + Math.round(ry * c.y) + 'px'
+        });
+        $('#ava_prev_medium_2').css({
+            width: Math.round(rx * parseInt($('#cropbox').css('width'))) + 'px',
+            height: Math.round(ry * parseInt($('#cropbox').css('height'))) + 'px',
+            marginLeft: '-' + Math.round(rx * c.x) + 'px',
+            marginTop: '-' + Math.round(ry * c.y) + 'px'
+        });
+
+        /*var rx = 40 / c.w;
+        var ry = 40 / c.h;
+
+        $('#ava_prev_medium_3').css({
+            width: Math.round(rx * $('#cropbox')[0].width) + 'px',
+            height: Math.round(ry * $('#cropbox')[0].height) + 'px',
+            marginLeft: '-' + Math.round(rx * c.x) + 'px',
+            marginTop: '-' + Math.round(ry * c.y) + 'px'
+        });
+        $('#ava_prev_medium_4').css({
+            width: Math.round(rx * $('#cropbox')[0].width) + 'px',
+            height: Math.round(ry * $('#cropbox')[0].height) + 'px',
+            marginLeft: '-' + Math.round(rx * c.x) + 'px',
+            marginTop: '-' + Math.round(ry * c.y) + 'px'
+        });*/
+
+        var rx = 30 / c.w;
+        var ry = 30 / c.h;
+
+        $('#ava_prev_small_1').css({
+            width: Math.round(rx * parseInt($('#cropbox').css('width'))) + 'px',
+            height: Math.round(ry * parseInt($('#cropbox').css('height'))) + 'px',
+            marginLeft: '-' + Math.round(rx * c.x) + 'px',
+            marginTop: '-' + Math.round(ry * c.y) + 'px'
+        });
+        $('#ava_prev_small_2').css({
+            width: Math.round(rx * parseInt($('#cropbox').css('width'))) + 'px',
+            height: Math.round(ry * parseInt($('#cropbox').css('height'))) + 'px',
+            marginLeft: '-' + Math.round(rx * c.x) + 'px',
+            marginTop: '-' + Math.round(ry * c.y) + 'px'
+        });
+
+        $('.avaprev').show();
+        ava_crop.removeClass('not-active');
+
+    };
+
+    ava_crop.click(function(){
+        $.ajax({
+            type: 'post',
+            url: '/ajax/avatarCrop',
+            data: {
+                x: coord_x,
+                y: coord_y,
+                w: coord_w,
+                h: coord_h
+            },
+            success: function(data)
+            {
+                if (data['ok'] == "ok") {
+                    $('#ava_change').hide();
+
+                    $('#preview_big').attr('src', data['img_url'] + '?' + new Date().getTime());
+
+                    $('.settings__avaButtonDiv').show();
+                    $('#preview_big').show();
+                    $('#ava_upload').show();
+                    $('#ava_loader').hide();
+
+                    $('#upload').hide();
+
+                    $('#file').val('');
+                }
+                else {
+                    //showFormMessage(msgId, button, data.error, 0);
+                    //changeIcon('no', target);
+                }
+            }
+        });
+    });
+
+    $('#ava_cancel_crop').click(function(){
+        $('#ava_change').hide();
+
+        $('.settings__avaButtonDiv').show();
+        $('#ava_upload').show();
+
+        $('#upload').hide();
+        $('#ava_loader').hide();
+
+        $('#file').val('');
+    });
+
+    $("#settings__tabs").tabs();
+    $("#settings-sub__tabs").tabs();
+
+    $('input[name=notify_new_orders]').click(function(){
+        $('#subscribeFilters').slideToggle();
+    });
+
+    $(".settings__saveButton").click(function () {
+        $('#msg_password-form').remove();
+        var form = $(this).closest("form");
+
+        if (form.attr("id") == "password-form") {
+            var button = $(this);
+            var msgId = "msg_" + form.attr("id");
+            if (checkChangePasswordForm(form, button)) {
+                var target = $(this).next();
+                changeIcon('loader', target);
+                form.ajaxSubmit({
+                    success: function (status) {
+                        if (status == "ok") {
+                            changeIcon('ok', target);
+                        } else {
+                            var oldPass = form.find("[name=old_password]");
+                            oldPass.css("border-color", "#D9D9D9");
+                            oldPass.css("border-color", "#f00");
+                            showFormMessage(msgId, button, $.i18n._("Проверьте корректность данных"), 0);
+                            changeIcon('hide', target);
+                        }
+                    }
+                });
+            }
+            else {
+                showFormMessage(msgId, button, $.i18n._("Проверьте корректность данных"), 0);
+            }
+        }else {
+
+            if ($(this).attr('id') === 'qualificationAllSaveButton') {
+                return;
+            }
+
+            var button = $(this);
+            var target = $(this).next();
+
+            if ($(button).hasClass('gray')) {
+                return false;
+            }
+
+			var block = $(this).closest('.withdraw__item'),
+                blockId = block.attr('id') || form.attr('id');
+
+            changeIcon('loader', target);
+
+            $.ajax({
+                url: form.attr('action').replace(/http[s]:\/\/.*\/ajax/i, '/ajax'),
+                method: form.attr('method'),
+                dataType: 'json',
+                data: form.serialize(),
+                beforeSend: function () {
+                    qualificationChangeBlock.signalAjaxBefore(blockId);
+                },
+                success: function (data) {
+                    var msgId = "msg_" + form.attr("id");
+                    var nickNameField = form.find('[name="nick_name"]').length ? form.find('[name="nick_name"]')[0] : null;
+                    if (data == "ok") {
+                        changeIcon('ok', target);
+                        $('#required-field-message').hide();
+                        //showFormMessage(msgId, button, "Данные успешно обновлены", 1);
+                        if (nickNameField && nickNameField.value !== nickNameTmp) {
+                            $(nickNameField).attr('disabled', true);
+                            $('[data-js="change-nickname-notice"]').hide();
+                        }
+                        if (
+                            form.attr('id') == 'changeGeoPlaces' &&
+                            form.find('[name=email]').length &&
+                            form.find('[name=email]').val() != form.find('[data-js=old_email]').val()
+                        ) {
+                            form.find('[data-js="email-tooltip"]').hide();
+                            if (parseInt(form.find('[name=email]').attr('setDisabled'), 10) == 1) {
+                                form.find('[name=email]').attr('disabled', true);
+                            }
+                        }
+                        disableAfterSave(form);
+                    }
+                    else {
+                        showDefaultMessage($.i18n._("Произошла ошибка"), data.error);
+                        changeIcon('no', target);
+                        //$('#errorPopup').html(data.error).dialog('open');
+                    }
+                    qualificationChangeBlock.signalAjaxSuccess(blockId);
+                }
+            });
+            isStudybayvalidForm = false;
+
+        }
+        if ($(this).attr('data-qualification') != 'undefined') {
+            $(this).addClass('gray');
+        }
+
+    });
+
+    $('.settings__greensave').click(function () {
+        var localId = $(this).attr('data-id');
+        var formList = $("#" + localId).find("form");
+        var localQueryString = "";
+        var formString = "";
+        formList.each(function () {
+            formString = $(this).formSerialize();
+            if (formString != "") {
+                if (localQueryString != "") localQueryString += "&";
+                localQueryString += formString;
+            }
+        });
+        var button = $(this);
+        var url = $(this).attr('data-url');
+        var target = $(this).next();
+        changeIcon('loader', target);
+        $.post(url, localQueryString).success(function (data) {
+                var msgId = "msg_" + localId;
+                if (data == "ok") {
+                    changeIcon('ok', target);
+                    //showFormMessageMain(msgId, button, "Данные успешно обновлены", 1);
+                }
+                else {
+                    changeIcon('no', target);
+                    //showFormMessageMain(msgId, button, data.error, 0);
+                }
+            }
+        );
+    });
+
+    avatarTabs ();
+
+    $('#unsubPopup').dialog({
+        width: 695,
+        autoOpen: true,
+        title: $.i18n._('Спасибо!'),
+        draggable: false,
+        modal: true,
+        buttons:
+        [
+            {
+                text: $.i18n._('Ок'),
+                class: 'green',
+                click: function() {
+                    $(this).dialog('close');
+                }
+            }
+        ]
+    });
+
+    $('#errorPopup').dialog({
+        width: 695,
+        autoOpen: false,
+        draggable: false,
+        title: $.i18n._('Ошибка'),
+        modal: true,
+        buttons:
+        [
+            {
+                text: $.i18n._('Ок'),
+                click: function() {
+                    $(this).dialog('close');
+                }
+            }
+        ]
+    });
+
+	$('#qualificationAllSaveButton').click(function () {
+		qualificationChangeBlock.ajaxSend();
+	});
+
+
+    var CHECKED_ALL = 1;
+    var UNCHECKED_ALL = 2;
+
+    var testIsSelectedAll = function(block) {
+        var isFullListSelected =  block.find('input:checked').length === block.find('input').length;
+        changeGlobalBlock($(block).closest('.settings__formBlock').siblings('.settings__checkboxWrap').find('input'), isFullListSelected);
+    };
+
+    var checkedAllChanges = function(block, action) {
+        var changeCheckedStatus = action !== CHECKED_ALL ? ':checked' : ':not(:checked)';
+        block.find('input' + changeCheckedStatus).each(function() {
+                $(this).prop('checked', action === CHECKED_ALL).parent().toggleClass('checked');
+            }
+        );
+    };
+
+    var changeGlobalBlock = function (input, isChecked) {
+        if (isChecked) {
+            input.parent().addClass('checked');
+        } else {
+            input.parent().removeClass('checked')
+        }
+        input[0].checked = isChecked;
+    };
+
+    $('#workTypesBlock .settings__formBlock .settings__checkboxWrap input,' +
+    '#categoryTypesBlock .settings__formBlock .settings__checkboxWrap input').on('change', function (e) {
+        testIsSelectedAll($(this).closest('.settings__formBlock'));
+    });
+
+    $('#workTypesBlock input[data-id], ' +
+    '#categoryTypesBlock input[data-id]').each(function(key, value) {
+        var mainBlock = $(value);
+        var parentBlock = $(mainBlock).closest('.settings__checkboxWrap').parent();
+
+        testIsSelectedAll(parentBlock.find('.settings__formBlock'));
+        parentBlock.children('.settings__checkboxWrap').find('input').on('change', function() {
+            var block = parentBlock.find('.settings__formBlock');
+
+            var isChecked = mainBlock.is(':checked');
+            var action = isChecked ? CHECKED_ALL : UNCHECKED_ALL;
+
+            changeGlobalBlock(mainBlock, isChecked);
+            checkedAllChanges(block, action);
+        });
+    });
+
+
+    // WEB-2300
+    (function() {
+
+        var about = $('#full_about');
+
+        if (about.length) {
+
+            var characters = $('#full_about_characters'),
+                maxLength = about.attr('maxlength');
+
+            function charactersLeft(max, valLength) {
+                return max - valLength;
+            }
+
+            try {
+                about.on('keyup', function() {
+                    characters.html(charactersLeft(maxLength, about.val().length));
+                });
+
+                characters.html(charactersLeft(maxLength, about.val().length));
+
+            } catch (e) {
+                console.log(e);
+            }
+        }
+
+    }());
+
+    (function() {
+        if (window.location.hash === '#contacts-block') {
+            if ($('#address').val().length === 0) {
+                $('#address').addClass('error').one('focus', function () {$(this).removeClass('error');});
+            }
+            if ($('#country').val().length === 0) {
+                $('#country').addClass('error').one('focus', function () {$(this).removeClass('error');});
+            }
+            if ($('#city').val().length === 0) {
+                $('#city').addClass('error').one('focus', function () {$(this).removeClass('error');});
+            }
+        }
+    })();
+
+});
+
+
+
+function avatarTabs () {
+    var tabs = $('.settings__ava_tab'),
+        item1 = $('.settings__ava_tabs-item1'),
+        item2 = $('.settings__ava_tabs-item2');
+
+    tabs.click(function() {
+        if(!$(this).hasClass('active')) {
+            tabs.removeClass('active');
+            $(this).addClass('active');
+        }
+        if($(this).hasClass('construct')) {
+            item1.hide();
+            item2.show();
+        }
+        else {
+            item2.hide();
+            item1.show();
+        }
+    })
+}
+
+function showFormMessage(msgId, elementBeforeMessage, messageBody, type) {
+    $("#" + msgId).remove();
+    className = (type == 0) ? "error_message" : "ok_message";
+    var message = "<div class='" + className + "' id=" + msgId + ">" + messageBody + "</div>";
+    elementBeforeMessage.after(message);
+}
+
+function showFormMessageMain(msgId, elementBeforeMessage, messageBody, type) {
+    $("#" + msgId).remove();
+    className = (type == 0) ? "error_message_main" : "ok_message_main";
+    var message = "<div class='" + className + "' id=" + msgId + ">" + messageBody + "</div>";
+    elementBeforeMessage.after(message);
+}
+
+function checkChangePasswordForm(form, button) {
+    var oldPass = form.find("[name=old_password]");
+    var newPass = form.find("[name=new_password]");
+    var newPassConf = form.find("[name=new_password_confirm]");
+    oldPass.css("border-color", "#D9D9D9");
+    newPass.css("border-color", "#D9D9D9");
+    newPassConf.css("border-color", "#D9D9D9");
+    var err = false;
+    if (oldPass.val() == "") {
+        oldPass.css("border-color", "#f00");
+        err = true;
+    }
+    if (newPass.val() == "") {
+        newPass.css("border", "2px solid #f00");
+        err = true;
+    }
+    else if (newPass.val() != newPassConf.val()) {
+        newPass.css("border", "2px solid #f00");
+        newPassConf.css("border", "2px solid #f00");
+        err = true;
+    }
+    if (err) {
+        return false;
+    }
+    else {
+        return true;
+    }
+}
+
+function goToAnchor(id){
+    if ($('[name="' + id + '"]').length > 0) {
+        var top = $('[name="' + id + '"]').offset().top;
+
+        setTimeout(function () {
+            if ($('.header').css('position') != 'relative') {
+                $(window).scrollTop(top - 60);
+            } else {
+                $(window).scrollTop(top);
+            }
+        }, 500);
+    }
+}
+
+function enableToSave(mainBlock){
+    var saveButton = mainBlock.find('.settings__saveButton');
+    saveButton.removeClass('gray').addClass('blue');
+    changeIcon('hide', saveButton.next());
+
+	var sendLine = $('#send_line'),
+        mainBLockId = mainBlock.attr('id') || mainBlock.find('form').attr('id');
+	if ( !sendLine.is(':visible') ) {
+		sendLine.show();
+		$('#qualificationAllSaveButton').removeClass('gray').addClass('blue');
+	}
+
+	qualificationChangeBlock.add(mainBLockId);
+}
+
+$(document).ready(function () {
+    var $timezoneGroup = $('[name="timezone-group"]');
+    var $timezone = $('[name="timezone"]');
+    if ($timezone.length && $timezoneGroup.length) {
+        var selectedTimezoneGroup = $('[name="current-timezone-group"]').val();
+        var selectedTimezone = $('[name="current-timezone"]').val();
+        var localGroupName = moment.tz.guess().split('/')[0];
+        var localGroup = $timezoneGroup.find(':contains(\'' + localGroupName + '\')').attr('value');
+        var getZones = function (id) {
+            $.ajax({
+                url: '/ajax/getTimeZonesListInGroup/' + id,
+                success: function(res) { renderZones(res) }
+            });
+        };
+
+        $timezoneGroup.val(selectedTimezoneGroup.length ? selectedTimezoneGroup : localGroup);
+        getZones(selectedTimezoneGroup.length ? selectedTimezoneGroup : localGroup);
+
+        $timezoneGroup.on('change', function(e) {
+            var selectedGroup = $(e.target).find(':selected').val();
+            getZones(selectedGroup);
+        });
+
+        var renderZones = function (data) {
+            data = data || {};
+            var markup = [];
+            for (var id in data) {
+                if (data.hasOwnProperty(id)) {
+                    markup.push('<option value="' + id + '" ' + (id == selectedTimezone ? "selected" : "") + '>' + data[id] + '</option>');
+                }
+            }
+            $timezone.html(markup.join(''));
+            $timezone.trigger('chosen:updated');
+        };
+    }
+
+    $(".settings__savePincode").click(function () {
+        var form = $(this).closest("form");
+        var button = $(this);
+        if ($(button).hasClass('gray')) {
+            return false;
+        }
+
+        if (form.attr("id") == "pincode-form") {
+
+            var msgId = "msg_" + form.attr("id");
+
+            var target = $(this).next();
+            changeIcon('loader', target);
+            form.ajaxSubmit({
+                success: function (response) {
+                    if (response.status == 'ok') {
+                        $('#pincode').attr('disabled', true);
+                        $('#pincode_confirm').attr('disabled', true);
+                        $(button).removeClass('blue').addClass('gray');
+                        showFormMessage(msgId, button, '', 1);
+                    } else {
+                        showFormMessage(msgId, button, response.message, 0);
+                    }
+                    changeIcon('hide', target);
+                }
+            });
+        }
+    });
+
+
+    //перенесено в личный кабинет->настройки->вкладка соц сети application/views/default/socialNetwork/index.twig
+});

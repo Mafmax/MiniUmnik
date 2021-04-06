@@ -1,0 +1,24 @@
+
+
+
+
+       A24.ordersItemToogle = function() {
+		   $(document).ready(function() { 
+		   $('.orders__item_bottom__messages').click(function() {
+
+			   var top = $(this).parent(),
+			       im = top.parent().find('.orders__item-im'),
+			       className = 'active';
+			   
+			   if (top.hasClass(className)) {
+				   top.removeClass(className);
+				   im.hide();
+				   }
+                   else {
+			       $(this).parent().addClass(className);
+				   im.show();
+				   }
+			   
+		   });
+		   });
+	   }

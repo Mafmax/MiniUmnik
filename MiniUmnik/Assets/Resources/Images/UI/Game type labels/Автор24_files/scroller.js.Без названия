@@ -1,0 +1,210 @@
+A24.scroller = function(target) {
+
+	var param = {
+		update: function(handler) {
+			this.handler = handler,
+			this.handlerHeight = this.handler.height(),
+			this.block = handler.closest('.im__content'),
+			this.blockHeight = handler.parent().height(),
+            this.contentBlock = this.block.find('.scroll__wraper');
+		},
+		handler: {},
+		handlerHeight: {},
+		blockHeight: {},
+		contentBlock: {}
+	};
+
+	var slideScrollbar = {
+
+        touch: function(elem) {
+            elem.on('touchstart',function(event) {
+                var touch = event.originalEvent.touches[0] || event.originalEvent.changedTouches[0],
+                    mouseOffsetY = touch.clientY;
+
+                    $(document).on('touchmove', function(event) {
+
+                       var touch = event.originalEvent.touches[0] || event.originalEvent.changedTouches[0] ,
+                           delta = -((touch.clientY - mouseOffsetY) / 8);
+
+
+                        var handler = elem.find('.handle'),
+                            handlerOffsetY = handler.position() ? handler.position().top : 0,
+                            step = handlerOffsetY + delta;
+
+
+                       slideScrollbar.move(step);
+
+
+                        event.preventDefault ? event.preventDefault() : (event.returnValue = false);
+                    });
+
+                    $(document).on('touchend',function() {
+                            $(document).unbind('touchmove');
+                     });
+
+                       event.preventDefault ? event.preventDefault() : (event.returnValue = false);
+
+            });
+        },
+
+		listener: function() {
+			$('.handle').on('mousedown',function(e) {
+
+                var mouseOffsetY = e.clientY - $(this).position().top;
+
+				$(document).on('mousemove', function(e) {
+					var step = e.clientY - mouseOffsetY;
+					slideScrollbar.move(step);
+				})
+
+                    .mouseup(function() {
+					$(document).unbind('mousemove')
+				});
+				return false;
+			})
+		},
+
+		move: function(step) {
+			if (step < param.handler.height()) {
+				step = param.handler.height();
+			} else if (step > param.blockHeight) {
+				step = param.blockHeight;
+			}
+
+			param.handler.css('top', step);
+
+			var procents = (param.blockHeight - step) / (param.blockHeight - param.handlerHeight) * 100;
+			slideContent(param.contentBlock, procents);
+
+            imHeight(param.contentBlock.parent());
+
+		},
+
+		updateHandlerHeight: function(block) {
+			var handler = block.find('.handle'),
+				blockHeight = block.height(),
+				handlerHeight = Math.round(blockHeight / block.find('.scroll__wraper').height() * blockHeight);
+
+			handler.css('height', handlerHeight);
+			handler.css('margin-top', -handlerHeight);
+		},
+
+		mousewheel: function(elem) {
+
+			elem = elem.get(0);
+
+			if (elem.addEventListener) {
+				if ('onwheel' in document) {
+					elem.addEventListener("wheel", onWheel, false);
+				} else if ('onmousewheel' in document) {
+					elem.addEventListener("mousewheel", onWheel, false);
+				} else {
+					elem.addEventListener("MozMousePixelScroll", onWheel, false);
+				}
+			} else {
+				elem.attachEvent("onmousewheel", onWheel);
+			}
+
+			function onWheel(e) {
+				e = e || window.event;
+
+				var delta = e.deltaY || e.detail || e.wheelDelta,
+					step,
+					start = null;
+
+				if (delta > 0) delta = 1;
+				if (delta < 0) delta = -1;
+
+				if (start == null) {
+					start = parseFloat(param.handler.css('top'));
+					if (start == 'auto') start = 0;
+				}
+
+				var height = $(elem).find('.scroll__wraper').height(),
+					k = 30000;
+
+				step = start + delta * (k / height);
+
+				slideScrollbar.move(step);
+
+				e.preventDefault ? e.preventDefault() : (e.returnValue = false);
+			}
+		},
+
+        arrows: function(elem) {
+
+            elem.hover(function() {
+                $(document).keydown(function(e){
+
+                //    e.preventDefault ? e.preventDefault() : (e.returnValue = false);
+
+                    var pushStep = function(delta) {
+                        var handler = elem.find('.handle'),
+                            handlerOffsetY = handler.position().top,
+                            step = handlerOffsetY + delta;
+
+                        slideScrollbar.move(step);
+                    };
+
+
+
+                    var delta = 20;
+
+                    if(e.which == 38) {
+                        pushStep(delta * -1);
+                    }
+
+                    if(e.which == 40) {
+                        pushStep(delta);
+                    }
+
+                })
+            }, function() {
+                $(document).unbind('keydown');
+            })
+
+
+        }
+	};
+
+	function init(elem) {
+
+        imHeight(elem);
+
+		if (elem.target) elem = $(this);
+		var content = elem.find('.scroll__wraper'),
+			contentHeight = content.height(),
+			blockHeight = elem.height(),
+			difference = contentHeight - blockHeight,
+            scroller = elem.find('.scroller');
+
+		if (difference > 0) {
+			if (!scroller[0]) elem.prepend($('<div class="scroller"><div class="handle"></div></div>'));
+			slideScrollbar.updateHandlerHeight(elem);
+			param.update(elem.find('.handle').css('top', '100%'));
+			content.css('bottom', 0);
+			slideScrollbar.listener();
+			slideScrollbar.mousewheel(elem);
+            slideScrollbar.arrows(elem);
+            slideScrollbar.touch(elem);
+
+		} else {
+            if (scroller[0]) {
+                scroller.remove();
+                content.attr('style', '');
+            }
+        }
+	}
+
+	function slideContent(contentBlock, procent) {
+		var blockHeight = contentBlock.parent().height(),
+			contentBlockHeight = contentBlock.height(),
+			workArea = contentBlockHeight - blockHeight,
+			p1 = workArea / 100;
+
+		contentBlock.css('bottom', -p1 * procent);
+	}
+
+	if (target) init(target);
+
+};

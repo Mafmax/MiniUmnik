@@ -1,0 +1,233 @@
+// JavaScript Document
+var prefix = $('html').prop('lang') == 'en'?'_en':'';
+A24.templates =  {
+
+
+    im__content_message: '<div class="im__content_message {whose} {new}" data-id="{comment_id}">'+
+                         '<img class="im__content_message-avatar" src="{img}" width="30" height="30">'+
+                         '<span  data-online="' + $.i18n._('онлайн') + '" data-offline="' + $.i18n._('не в сети') + '" class="im__content_message-login {online}" >{login}</span>'+
+                         '<span class="im__content_message__his-group">{group}</span>'+
+                         '<div class="im__content_message-text">'+
+                         '{text}'+
+                         '</div></div>',
+
+    notice:              '<div class="notice__item selected" data-id="{id}" data-order_id="{order_id}">'+
+                         '<span class="notice__item-who">{whom}</span> '+
+                         '<span class="notice__item_user">{customer_nick}</span>'+
+                         '<span class="notice__item_time">{date}</span>'+
+                         '<div class="notice__item_text">{text}</div>'+
+                         '<a href="/order/getoneorder/{order_id}" class="notice__item_button green">' + $.i18n._('В заказ') + '</a>'+
+                         '<div class="notice__item_close" data-action="remove"></div>'+
+                         '</div>',
+
+    referenceNotice:     '<div class="notice__item selected" data-id="{id}" data-order_id="{order_id}">'+
+                         '<span class="notice__item_time">{date}</span>'+
+                         '<div class="notice__item_text">{text}</div>'+
+                         '<a data-action="remove" class="notice__item_button green">ок</a>'+
+                         '<div class="notice__item_close" data-action="remove"></div>'+
+                         '</div>',
+
+    recommended:         '<div class="recommended__item {premium}" data-id="{order_id}">'+
+                         '<div class="recommended__item_close" data-action="{remove}"></div>'+
+                         '<div class="recommended__item_orderNumber">#{order_id}</div>'+
+                         '<a class="recommended__item_orderCategory" href="/order/getoneorder/{order_id}?rec">{title}</a>'+
+                         '<div class="recommended__item_orderTitle">{type_name}, {category_name}</div>'+
+                         '<div class="recommended__item_orderPrise">'+
+                         '<span class="recommended__item-left">' + $.i18n._('Цена') + ':</span>'+
+                         '<span class="recommended__item-rigth">' + $.i18n._('По договоренности') + '</span></div>'+
+                         '<div class="recommended__item_deadline">'+
+                         '<span class="recommended__item-left">' + $.i18n._('Срок сдачи') + ':</span>'+
+                         '<span class="recommended__item-rigth">{deadline}</span>'+
+                         '</div></div>',
+    recommendedfw:       '<div class="recommended__item" data-control="recommend_fw" data-url="{url}">'+
+                         '<a class="recommended__item_orderCategory" href="{url}">'+
+                         '{type}, {subject}</a>'+
+                         '<div class="recommended__item_orderTitle">'+
+                         '{title}</div>'+
+                         '<div class="recommended__item_orderPrise">'+
+                         '<span class="recommended__item-left">' + $.i18n._('Цена') + ':</span>'+
+                         '<span class="recommended__item-rigth">'+
+                         '{price} &nbsp;'+
+                         $.i18n._('<span class="ruble rel">p<span class="dot dborder">.</span>')+
+                         '</span>'+
+                         '</div>'+
+                         '</div>',
+    messages:{
+        customer:        '<div class="im__content_message {his} {new}" data-id="{comment_id}">\
+                          <img class="im__content_message-avatar" src="{avatar}" width="30" height="30">\
+                          <span data-offline="' + $.i18n._('не в сети') + '"  data-online="' + $.i18n._('онлайн') + '"  class="im__content_message-login {online}">{nick_name}</span>\
+                          {readable_online}\
+                          <div class="im__content_message-text {comment_style}">\
+                          {text}</div>\
+                          {file}\
+                          </div>',
+        performer:        '<div class="im__content_message {his} {new} {comment_style}" data-id="{comment_id}">\
+                          <img class="im__content_message-avatar" src="{avatar}" width="30" height="30">\
+                          <div class="im__content_message-text">\
+                          {text}</div>\
+                          {file}\
+                          </div>',
+        admin:            '<div class="im__content_message {his} {new}" data-id="{comment_id}">\
+                          <img class="im__content_message-avatar" src="/assets/img/administration' + prefix + '.png" width="30" height="30">\
+                          <span data-offline="' + $.i18n._('не в сети') + '" class="im__content_message-login messages__hidden">' + $.i18n._('Администрация') + '</span>\
+                          <div class="im__content_message-text {comment_style} messages__admin">\
+                          {text}</div>\
+                          {file}\
+                          </div>',
+        assistant:        '<div data-type="assistant" class="im__content_message {his} {new}" data-id="{comment_id}">\
+                          <img class="im__content_message-avatar" src="/assets/images/messages/assistant_logo.svg" width="30" height="30">\
+                          <span data-offline="' + $.i18n._('не в сети') + '" class="im__content_message-login messages__hidden">' + $.i18n._('Ассистент') + '</span>\
+                          <div class="im__content_message-text {comment_style} messages__assistant">\
+                          {text}</div>\
+                          {file}\
+                          </div>'
+    },
+
+    orderlist:           '<div class="messages__left_item" data-stage-int="{stage-int}" data-action="get" data-id="{order_id}" data-online="{online}" data-readable_online="{readable_online}"  data-title="{title}" data-prevented="{prevented}" data-cutomer_nick_name="{nick}" data-type="{type}" data-category="{category}">\
+                            <div data-action="get" class="messages__left_item-orderNumber">\
+                                <a href="/order/getoneorder/{order_id}"># {order_id}</a>\
+                            </div>\
+                            <div data-action="get" class="messages__left_item-orderTitle">{shorttitle}</div>\
+                            <span class="messages__left_item-stage">{status}</span>\
+                        </div>',
+    orderslist:            '<div class="im__content_message {his} {new}">\
+                          <img class="im__content_message-avatar" src="{avatar}" width="30" height="30">\
+                          <span  data-online="' + $.i18n._('онлайн') + '" data-offline="' + $.i18n._('не в сети') + '" class="im__content_message-login {online}">{nick_name}</span>\
+                          <span class="im__content_message__his-group">{user_group}</span>\
+                          <div class="im__content_message-text">\
+                          {text}</div>\
+                          </div>',
+    topMessages:        '<div class="messages__header-text"><a href="/order/getoneorder/{id}">{title}</a><BR>{type}, {category}</div>\
+                                <span data-online="' + $.i18n._('онлайн') + '" class="messages__header-login {online}" href="#">{cutomer_nick_name}</span>\
+                                {readable_online}',
+
+    rateworklist:         '<div class="profile__reviews-item">\
+        <div class="profile__reviews-item__header">\
+            <img class="profile__reviews-ava" src="{avatar}" width="30" height="30" >\
+            <div class="profile__reviews-row">\
+                <span class="profile__reviews-login">{customer_nick}</span>\
+                <span class="profile__reviews-date">{date}</span>\
+            </div>\
+            <div class="profile__reviews-row">\
+                {deadline_type} {grade}\
+            </div>\
+        </div>\
+        <div class="profile__reviews-text">{comment}</div>\
+        </div>',
+
+    rateworklist_grade_bad: '<span class="profile__reviews-bad">' + $.i18n._('Отрицательный') + '</span>',
+    rateworklist_grade_good: '<span class="profile__reviews-good">' + $.i18n._('Положительный') + '</span>',
+    rateworklist_deadline_bad: '<span class="profile__deadline-bad">' + $.i18n._('С задержкой') + '</span>',
+    rateworklist_deadline_good: '<span class="profile__deadline-good">' + $.i18n._('В срок') + '</span>',
+    rateworklist_deadline_reject_50: '<span class="profile__deadline-bad">' + $.i18n._('Отказ на 50%') + '</span>',
+
+    lastorderlist: {
+        oldType : '<tr>\
+                    <td class="profile__lastOrders-table_ico {grade_type}"></td>\
+                    <td> <a href="/order/getoneorder/{order_id}">{title}</a></td>\
+                    <td>{category_name}</td>\
+                    <td>{type_name}</td>\
+                    <td class="profile__lastOrders-table_time {deadline_type}"></td>\
+               </tr>',
+        newType : '<div class="table_orders_item">\
+                    <div class="td_order">\
+                        <span>{category_name}, {type_name}</span>\
+                        <br>\
+                        {title}\
+                    </div>\
+                    <div class="td_review">\
+                        <span class="profile__reviews-{grade_type}">&nbsp;</span>\
+                    </div>\
+                    <div class="td_time">\
+                        <span class="profile__deadline-{deadline_type}">&nbsp;</span>\
+                    </div>\
+                </div>\
+                <div class="clear"></div>',
+        oldTypeMy : '<tr>\
+                    <td class="profile__lastOrders-table_ico {grade_type}"></td>\
+                    <td> <a href="/order/getoneorder/{order_id}">{title}</a></td>\
+                    <td>{category_name}</td>\
+                    <td>{type_name}</td>\
+                    <td class="profile__lastOrders-table_time {deadline_type}"></td>\
+               </tr>',
+        oldTypeAlien : '<tr>\
+                    <td class="profile__lastOrders-table_ico {grade_type}"></td>\
+                    <td>{title}</td>\
+                    <td>{category_name}</td>\
+                    <td>{type_name}</td>\
+                    <td class="profile__lastOrders-table_time {deadline_type}"></td>\
+               </tr>'
+    },
+
+
+    //для портфолио два разных шаблона (мои - не мои)
+    portfolio: {
+        my : '<div data-id="{portfolio_id}" data-container="portfolio_item" class="portfolio_item">' +
+                '<div class="profile__portfolio-file_remove" style="text-align: right; cursor: hand" data-action="remove"></div>' +
+                '<a class="profile__portfolio-file" href="/portfolio/{filehash}">'+
+                    '<span class="universal_file_type"><span>{extension}</span></span>' +
+                    '{title}' +
+                '</a>' +
+            '</div>',
+        his : '<div data-id="{portfolio_id}" data-container="portfolio_item" class="portfolio_item">' +
+                '<a class="profile__portfolio-file" href="/portfolio/{filehash}">'+
+                    '<span class="universal_file_type"><span>{extension}</span></span>' +
+                    '{title}' +
+                '</a>' +
+            '</div>'
+    },
+
+    specificAuthorOrders:
+
+        '<div class="orders__item block">\
+         <div class="orders__item-text">\
+         <a href="/order/getoneorder/{id}">{title}</a>\
+         <div class="orders__item-type">{type}</div></div>\
+         <div class="orders__item_bottom">' + 
+
+         `
+            <div class="orders__item_bottom__state">
+                <div class="findOrder-resault__item-star {fav}" rel="{id}"></div>
+                # {id}
+            </div>
+
+            <div class="orders__item_bottom__state">
+                <img src="/assets/icons/clipboard.svg" alt="status" />
+                {status}
+            </div>
+
+            <div class="orders__item_bottom__state">
+                <img src="/assets/icons/clock.svg" alt="deadline" />
+                ${$.i18n._('Сдать до')} {deadline}
+            </div>
+        ` +
+        '<div class="countMessages orders__item_bottom__messages" data-action="showcomment" data-id="{id}" data-module="orderslist">' 
+        + $.i18n._('Сообщения') + ' &nbsp;&nbsp; \
+            <athr-counter \
+                value="{message}"\
+                prefix="+"\
+                style="display: none"\
+                id="unreadMessageCnt_224910"\
+                data-action="showcomment"\
+                data-id="224910"\
+                data-module="orderslist" \
+            ></athr-counter>\
+        </div></div>\
+\
+        <div class="orders__item-im">\
+            \
+            <div id="commentlist_{id}" class="im__content">\
+            <div data-view="temsWraper" class="scroll__wraper">\
+            </div>\
+            </div>\
+            <div data-module="im__content_message" data-id="{id}" class="im__control" id="content_message_{id}">\
+                <div data-control="text" contenteditable="true" class="im__control-textarea" placeholder="' + $.i18n._('Комментировать...') + '"></div>\
+                <div data-module="im__content_message" data-action="submitter" class="button blue im__control-button" data-id="{id}">' + $.i18n._('Ответить') + '</div>\
+                <div data-control="file" class="im__control-file fileupload" data-prevented="{prevented}" {block} data-id="{id}"></div>\
+            </div>\
+        </div>\
+    </div>',
+
+    MessagesSeparator: '<div class="separator"><span>' + $.i18n._('Новые сообщения') + '</span></div>'
+
+};

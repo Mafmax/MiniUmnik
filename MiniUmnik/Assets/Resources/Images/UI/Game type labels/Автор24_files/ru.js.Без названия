@@ -1,0 +1,4 @@
+var dictionary = {
+'Авторизация': 'Авторизация'
+};
+$.i18n.load(dictionary);

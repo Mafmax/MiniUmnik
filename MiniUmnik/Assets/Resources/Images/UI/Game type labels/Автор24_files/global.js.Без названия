@@ -1,0 +1,493 @@
+// fix IE8+ console.log error
+window.console = console || {log: function(){}};
+
+$(document).ready( function() {
+
+    var isFormLoaded = false;
+    var authForm = $('#auth-form');
+    $('#login').click(function(){
+        if ($(this).is('.isNotForm')) {
+            return;
+        }
+        if (!isFormLoaded) $.ajax({
+            url: '/ajax/getLogin',
+            method: 'get',
+            data: {
+                type: 'legacy'
+            },
+            success: function (form) {
+                isFormLoaded = true;
+                form = $(form);
+                var tokenField = form.find('[data-js="token"]');
+                authForm.html(form);
+                $.ajax({
+                    url: "https://a24.biz/ajax/getCSRFToken/",
+                    type: "GET",
+                    xhrFields: { withCredentials: true },
+                    crossDomain: true
+                })
+                .done((token) => {
+                    setTimeout(function(){
+                        for (name in token) {
+                            tokenField.attr('name', name);
+                            tokenField.val(token[name]);
+                        }
+                    }, 0);
+                })
+                .fail((err) => {
+                    console.error(err);
+                })
+            },
+            error: function (xhr) {
+                if (xhr.status === 418) window.location.reload(true);
+            }
+        });
+        authForm.show();
+    });
+
+    $(document).on('click', '#auth-form .close', function(){
+        authForm.hide();
+    });
+	$('.btn-account').click(function(){
+        $('.account-menu').toggleClass('active');
+    });
+
+    // проверка баланса для стилизации
+    // приведение к числу при помощи побитовой операции ~~
+    var profileBalance = ~~$('.profile-balance span').text();
+    if ( !(profileBalance > 0) ) {
+        $('.profile-balance').addClass('empty-balance');
+    }
+
+
+    $('#reg').click(function(){
+        $('.overlay-shadow').css({'opacity' : '0.25', 'filter' : 'alpha(opacity=25)'}).show();
+        $('.login-form-holder').show();
+    });
+    $('.login-form-holder .close').click(function(){
+        $('.overlay-shadow').css({'opacity' : '0.9', 'filter' : 'alpha(opacity=90)'}).hide();
+        $('.login-form-holder').hide();
+    });
+	// Слежение за изменением логина
+	var login_change = false;
+
+	// Cтилевые трюки для инпутов
+	/*$('#auth-email').val('E-mail');
+
+	// Скрываем настоящее поле пароля и показываем его снова при фокусе на нем
+	$('#auth-password').after('<input type="text" id="auth-pseudo" value="Пароль" class="floatLeft">');
+	$('#auth-password').hide();
+
+	$('#auth-pseudo').live( 'focus', function() {
+		$(this).remove();
+		$('#auth-password').show().focus();
+	} );*/
+
+	// Убираем подсказку при фокусе
+	/*$('#auth-email').focus( function() {
+		if ( $(this).val() == 'E-mail' ) {
+			login_change = true;
+			$(this).val('');
+		}
+	});*/
+
+	// Обработка нажатия "Enter" при вводе данных в глобальную форму входа
+	$('#auth-password').bind('keypress', function(e) {
+		var code = (e.keyCode ? e.keyCode : e.which);
+		if ( code == 13) {
+		  $('#global-auth-form').submit();
+		}
+	});
+
+	// Обаботчик кнопки Войти
+	$('#auth-submit').click( function(){
+		/*if ( login_change == false )
+			$('#auth-email').val('');*/
+
+		$('#global-auth-form').submit();
+	});
+
+    $('#submitLogin').click( function(){
+        $('#global-auth-form2').submit();
+    });
+
+
+	// Обработчик открытия новости
+	/*$('a.news').click(function(){
+
+		var id = $(this).attr('rel');
+
+		var host = window.location.hostname;
+
+		if ( host == 'localhost' ) {
+			host += '/author24';
+		}
+
+		$.getJSON( ('https:' == document.location.protocol ? 'https://' : 'http://') + host + '/ajax/get-news-' + id, function(data) {
+			$('#forOneNew #contentForOneNew').html(data.content);
+			$('#forOneNew').show();
+		});
+
+		return false;
+	});*/
+
+	$(document).on('click', '.modal .shadow', function(){
+		$(this).parent().hide();
+	});
+
+	$(document).on('click', '.modal .btn-close', function(){
+        $(this).parent().parent().hide();
+    });
+
+    $(document).on('click', '.modal .closeButton', function(){
+        $(this).parent().parent().parent().hide();
+    });
+
+	$('.modal .btn-close').on('click', function(){
+		$(this).parent().parent().hide();
+	});
+
+    // Форма подтверждения номера
+    var changingPhone = false;
+    $('#phoneConfirmTrigger').click(function(){
+        if ($(this).attr('data-change') == 'true') {
+            changingPhone = true;
+        }
+        showConfirmCode();
+    });
+
+    if ($("#phoneConfirmForm #phone").length > 0) {
+        $("#phoneConfirmForm #phone").mask('999-999-99-99');
+        $("#phoneConfirmForm #confirmKeyInput").mask('9999-9999');
+        $("#phoneConfirmForm #confirmKeyChangeInput").mask('9999-9999');
+    }
+
+    function showConfirmCode(){
+        $('.overlay-shadow').css({'opacity' : '0.25', 'filter' : 'alpha(opacity=25)'}).show();
+        $('.phone-confirm-holder').show();
+        $.ajax(
+        {
+            type: "post",
+            url: "/user/viewPhoneConfirmAjax",
+            cache: false
+        });
+    };
+    function hideConfirmCode(){
+        $('.overlay-shadow').css({'opacity' : '0.9', 'filter' : 'alpha(opacity=90)'}).hide();
+        $('.phone-confirm-holder').hide();
+    }
+
+    $('.phone-confirm-header span').click(function(){
+        hideConfirmCode();
+    });
+    $('.phone-confirm-holder p.success span').click(function(){
+        hideConfirmCode();
+    });
+    $('.phone-confirm-holder button.send-code, .phone-confirm-holder #resendCode, .phone-confirm-holder #resendChangeCode').click(function(){
+        var element = $(this);
+
+        var mask = $('#websites3').find('option:selected').attr('data-mask');
+        if ($("#phoneConfirmForm #phone").val().length != mask.length) {
+            alert('Введите пожалуйста свой номер телефона!');
+            return false;
+        }
+
+        var paramChangePhone = '';
+        if (changingPhone) {
+            if ($(this).attr('id') == 'resendChangeCode') {
+                paramChangePhone = '&change=2';
+            } else if ($(this).attr('id') != 'resendCode') {
+                paramChangePhone = '&change=1';
+            }
+        }
+        $.ajax(
+        {
+            type: "post",
+            url: "/user/phoneConfirmAjax?type=sendCode"+paramChangePhone,
+            data: $('#phoneConfirmForm').serialize(),
+            async: false,
+            dataType: 'json',
+            cache: false,
+            success: function(msg)
+            {
+                if (msg.phonesMatch) {
+                    alert('Номера совпадают!');
+                } else {
+                    if (msg.future && (msg.future.sendMessage == true || msg.future.repeatAfter)) {
+                        var phone = $("#phoneConfirmForm #phone").val();
+                        $("#phoneConfirmForm #phone").attr('disabled', 'disabled');
+                        $("#phoneConfirmForm #hiddenPhone").attr('value', phone);
+                        $(element).hide();
+                        $('#confirmKeyBlock').show();
+                        $('#confirmKeyBlock span.error').hide();
+                        $('#confirmPhoneButton').css('display', 'block');
+                        $('#repeatProblem #repeatAfter').html(msg.future.repeatAfter);
+
+                        $('.phone-confirm #repeatProblem').show();
+                        var currentTime = parseInt($('.phone-confirm #repeatProblem #repeatAfter').html());
+                        $('.phone-confirm #repeatProblem #repeatAfter').html(getStringMinutesSecondsFromSeconds(currentTime));
+                        $('.phone-confirm #repeatProblem #repeatAfter').show();
+
+                        var intervalId = setInterval(function() {
+                            currentTime--;
+                            if (currentTime != -1) {
+                                $('.phone-confirm #repeatProblem #repeatAfter').html(getStringMinutesSecondsFromSeconds(currentTime));
+                            } else {
+                                $('.phone-confirm #repeatProblem').hide();
+                                $('.phone-confirm #repeatProblem #repeatAfter').hide();
+                                $('.phone-confirm #resendCode').show();
+                                clearInterval(intervalId);
+                            }
+                        }, 1000);
+                    } else {
+                        //alert('Сообщение на новый номер не отправлено!');
+                        return false;
+
+                    }
+
+                    if (msg.current && (msg.current.sendMessage == true || msg.current.repeatAfter)) {
+                        $(element).hide();
+                        $('#confirmKeyChangeBlock').show();
+                        $('#confirmKeyChangeBlock span.error').hide();
+                        $('#confirmPhoneButton').css('display', 'block');
+                        $('#repeatChangeProblem #repeatChangeAfter').html(msg.current.repeatAfter);
+
+                        $('.phone-confirm #repeatChangeProblem').show();
+                        var currentChangeTime = parseInt($('.phone-confirm #repeatChangeProblem #repeatChangeAfter').html());
+                        $('.phone-confirm #repeatChangeProblem #repeatChangeAfter').html(getStringMinutesSecondsFromSeconds(currentChangeTime));
+                        $('.phone-confirm #repeatChangeProblem #repeatChangeAfter').show();
+
+                        var intervalChangeId = setInterval(function() {
+                            currentChangeTime--;
+                            if (currentChangeTime != -1) {
+                                $('.phone-confirm #repeatChangeProblem #repeatChangeAfter').html(getStringMinutesSecondsFromSeconds(currentChangeTime));
+                            } else {
+                                $('.phone-confirm #repeatChangeProblem').hide();
+                                $('.phone-confirm #repeatChangeProblem #repeatChangeAfter').hide();
+                                $('.phone-confirm #resendChangeCode').show();
+                                clearInterval(intervalChangeId);
+                            }
+                        }, 1000);
+                    } else {
+                        //alert('Сообщение на текущий номер не отправлено!');
+                        return false;
+
+                    }
+                }
+            },
+            error: function(e)
+            {
+                alert('Произошла непредвиденная ошибка(PCF). Обратитесь в службу поддержки!');
+            }
+        });
+
+        return false;
+    });
+
+    $('.phone-confirm button.confirm').click(function() {
+        var element = $(this);
+        if ($('#confirmKeyInput').val().length != 9) {
+            alert('Пожалуйста введите код подтверждения!');
+            return false;
+        }
+        if (changingPhone && $('#confirmKeyChangeInput').val().length != 9) {
+            alert('Пожалуйста введите второй код подтверждения!');
+            return false;
+        }
+        var paramChangePhone = '';
+        if (changingPhone) {
+            paramChangePhone = '&change=1';
+        }
+
+        $.ajax(
+        {
+            type: "post",
+            url: "/user/phoneConfirmAjax?type=enterCode"+paramChangePhone,
+            data: $('#phoneConfirmForm').serialize(),
+            async: false,
+            dataType: 'json',
+            cache: false,
+            success: function(msg)
+            {
+                if (changingPhone) {
+                    if (msg.future.confirmedPhone == true && msg.current.confirmedPhone == true) {
+                        $('#successChangePhone').show();
+                        $('.phone-confirm input.confirm-code').css('border-color', '#bababa');
+                        $('.phone-confirm span.error').hide();
+                        $('.phone-confirm span.problems').css('margin-top', '-8px');
+                        $(element).hide();
+                        $('#currentConfirmedPhone').html('Номер подтвержден: '+msg.future.number);
+                        $('#phoneConfirmTrigger').hide();
+                        return false;
+                    }
+                    if (msg.current && msg.current.confirmedPhone == true) {
+                        $('#confirmKeyChangeBlock #invalidCodeChangeProblem').hide();
+                        $('#confirmKeyChangeBlock #expireCodeChangeProblem').hide();
+                    } else if (msg.current && msg.current.expireCode == true) {
+                        $('.phone-confirm #expireCodeChangeProblem').show().css('margin-top', '0px');
+                        $('.phone-confirm #repeatChangeProblem').hide();
+                        $('.phone-confirm #repeatChangeProblem #repeatAfter').hide();
+                        $('.phone-confirm #resendChangeCode').show();
+                        $('.phone-confirm span.problems').css('margin-top', '-2px');
+                        $('.phone-confirm input.confirm-code').css('border-color', 'red');
+                    } else if (msg.current) {
+                        $('.phone-confirm #invalidCodeChangeProblem').show().css('margin-top', '0px');
+                        $('.phone-confirm span.problems').css('margin-top', '-2px');
+                        $('.phone-confirm input.confirm-code').css('border-color', 'red');
+                    }
+                } else if (msg.future && msg.future.confirmedPhone == true)  {
+                    if ($('#phoneConfirmTrigger').attr('data-refresh') == 'true') {
+                        location.reload();
+                    }
+                    $('#successPhone').show();
+                    $('.phone-confirm input.confirm-code').css('border-color', '#bababa');
+                    $('.phone-confirm span.error').hide();
+                    $('.phone-confirm span.problems').css('margin-top', '-8px');
+                    $(element).hide();
+                    $('#phoneConfirmTrigger').html('Номер подтвержден: '+msg.future.number).removeAttr('id');
+                    return false;
+                }
+
+                if (msg.future && msg.future.confirmedPhone == true) {
+                    $('#confirmKeyBlock #invalidCodeProblem').hide();
+                    $('#confirmKeyBlock #expireCodeProblem').hide();
+                } else if (msg.future && msg.future.expireCode == true) {
+                    $('.phone-confirm #expireCodeProblem').show().css('margin-top', '0px');
+                    $('.phone-confirm #repeatProblem').hide();
+                    $('.phone-confirm #repeatProblem #repeatAfter').hide();
+                    $('.phone-confirm #resendCode').show();
+                    $('.phone-confirm span.problems').css('margin-top', '-2px');
+                    $('.phone-confirm input.confirm-code').css('border-color', 'red');
+                } else if (msg.future && msg.future.confirmedPhone == false) {
+                    $('.phone-confirm #invalidCodeProblem').show().css('margin-top', '0px');
+                    $('.phone-confirm span.problems').css('margin-top', '-2px');
+                    $('.phone-confirm input.confirm-code').css('border-color', 'red');
+                }
+            },
+            error: function(e)
+            {
+                alert('Произошла непредвиденная ошибка(PCF). Обратитесь в службу поддержки!');
+            }
+        });
+        return false;
+    });
+
+    var hash = location.hash;
+    if (hash.indexOf('phoneConfirm') != -1 && $('.phone-confirm-holder').css('display') == 'none') {
+        if ($('#phoneConfirmTrigger').attr('data-change') == 'true' || $('.phone-confirm-holder').attr('data-change') == 'true') {
+            changingPhone = true;
+        } else {
+            showConfirmCode();
+        }
+    }
+
+    initMessagesDropdown();
+
+    try {
+        // прибитый футер
+        var throttledStickyFooter = _.throttle(stickyFooter, 250);
+        throttledStickyFooter();
+        $(window).on('resize', throttledStickyFooter);
+        $('body').on('scroll', throttledStickyFooter);
+
+    } catch (e) {
+        console.log(e);
+    }
+});
+
+function stickyFooter() {
+
+    var header = $('.header');
+    var content = $('.content-wraper');
+    var footer = $('.footer-fix');
+
+    var viewportHeight = $(window).height();
+    var headerHeight = header.outerHeight(true);
+    var footerHeight = footer.innerHeight();
+
+    content.css({
+        'min-height': viewportHeight - headerHeight - footerHeight - 100 + 'px'
+    });
+
+}
+
+function addMoney(value){
+    $.cookie('addmoney_delete_storage', value,  {path: "/"});
+}
+
+function changeMask(elem)
+{
+    var mask = $(elem).find('option:selected').attr('data-mask');
+    $("#phoneConfirmForm #phone").mask(mask);
+}
+
+function getStringMinutesSecondsFromSeconds(seconds)
+{
+    var currentMinute = Math.floor(seconds / 60);
+    var currentSecond = seconds % 60;
+    var string = currentMinute+':'+currentSecond;
+
+    return string;
+}
+
+function initMessagesDropdown() {
+    $('.messages__block').hover(function () {
+        $(this).find('.header__messages_dropdown').addClass('display-block');
+    }, function () {
+        $(this).find('.header__messages_dropdown').removeClass('display-block');
+    });
+
+    $('.notifications__block').hover(function () {
+        $(this).find('.header__messages_dropdown').addClass('display-block');
+    }, function () {
+        $(this).find('.header__messages_dropdown').removeClass('display-block');
+    });
+
+    $('.clearNotifications').on('click', function () {
+        $.post('/ajax/cleanAllUnreadNotification', function(){
+            $('.notifications__block .header__messages_dropdown').addClass('empty');
+            $('.notifications__block .dropdown__list').empty();
+            $('#unreadNotificationCnt_allTop2').addClass('hidden');
+            $('.notifications__block .dropdown__foot').addClass('hidden');
+            $('.notifications__block .dropdown__head').html('<span>' + $.i18n._('У вас нет новых уведомлений') + '</span>');
+        });
+    });
+
+    $('.clearMessages').on('click', function () {
+        $.post('/ajax/clearNewMessages', function(){
+            $('.messages__block .header__messages_dropdown').addClass('empty');
+            $('.messages__block .dropdown__list').empty();
+            $('#unreadMessageCnt_allTop2').addClass('hidden');
+            $('.messages__block .dropdown__foot').addClass('hidden');
+            $('.messages__block .dropdown__head').html('<span>' + $.i18n._('У вас нет новых сообщений') + '</span>');
+        });
+    });
+
+    $('.dropdown__item').on('click', function(event) {
+        var el = $(event.target).closest('.dropdown__item'),
+            location = el.find('a').attr('href');
+        window.location.href = location;
+    });
+
+}
+
+// костыль для валидации email
+function isEmail (s) {
+    return /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9]){1,})+$/.test(s);
+}
+
+$.i18n.sum_format = function(sum, suffix) {
+    function format(number, n, x, s, c) {
+        var re = '\\d(?=(\\d{' + (x || 3) + '})+' + (n > 0 ? '\\D' : '$') + ')',
+            num = number.toFixed(Math.max(0, ~~n));
+        return (c ? num.replace('.', c) : num).replace(new RegExp(re, 'g'), '$&' + (s || ','));
+    };
+
+    var response = null;
+    if ($('html').attr('lang') == 'en') {
+        response = (!!suffix ? suffix : $.i18n._('$')) + format(sum, 2, 3, ',', '.');
+    } else {
+        response = format(sum, 0, 3, ' ', '.') + ' ' + (!!suffix ? suffix : $.i18n._('руб'));
+    }
+    return response;
+}

@@ -1,0 +1,904 @@
+// A24
+var A24 = A24 || {};
+
+A24.moduleConstructor = function () {};
+
+A24.modules = {};
+
+A24.checkEmail = function(email) {
+    return /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9]){1,})+$/.test(email);
+};
+
+if('jQuery' in window && 'validator' in jQuery) {
+    jQuery.validator.addMethod('serverEmail', function (value) {
+        return A24.checkEmail(value);
+    });
+}
+
+/**
+ * шаблонизатор на ejs
+ * @Input tplPath - path to ejs template file
+ * @Input data value representing as object {key:val}
+ * @Output string (compiled template)
+ */
+A24.template = function(tplPath, data) {
+    var url = '/assets/js/v1/' + tplPath;
+    data = data || {};
+    return new EJS({url: url}).render(data);
+};
+
+/**
+ * Логгируем ошибки.
+ * Передаем если хотим комментарий и данные по этой ошибке
+ *
+ * @Input object params
+ */
+/*A24.errorLogger = function(params) {
+    var comment = params.comment || '',
+        data = params.data || {};
+
+    try {
+        data = JSON.stringify(data);
+    } catch (e) {
+        data = '{}';
+    }
+
+    $.ajax({
+        type: "POST",
+        url: '/ajax/logJsErrors',
+        data: {
+            'comment' : comment,
+            'data' : data
+        },
+        cache: false,
+        dataType: 'JSON',
+        success: function(msg) {
+            console.log('Error logged status: '  + msg.status);
+        },
+        error: function(error) {
+            console.log('Все плохо');
+        }
+    });
+
+}; 01.02.2017*/
+
+/**
+ * функция для получения GET параметра из uri строки
+ * аналог php-шного $_GET[name],
+ * использование: if ( A24.urlParam('param1') != '' ) { ...
+ * @Input name - param name
+ * @Output {*|number} (get param value)
+ */
+A24.urlParam = function(name) {
+    var results = new RegExp('[\\?&]' + name + '=([^&#]*)').exec(window.location.href);
+    if (results !== null) {
+        return results[1];
+    } else {
+        return false;
+    }
+};
+
+A24.constant = {
+    maxFileSize: 52428800,
+    acceptedExt: 'doc|xls|xlsx|docx|rtf|odt|txt|jpg|png|gif|frw|cdw|m3d|a3d|zip|rar|pdf|pptx|ppt|jpeg|dwg|psd|001|002|003|004|005'.split('|'),
+    windowInitHeight: $(window).height(),
+    windowInitWidth: $(window).width()
+};
+
+/*** datepicker defaults ***/
+(function() {
+
+    var lang = $('html').attr('lang'),
+        options = { dateFormat: 'dd.mm.yy' };
+
+    if (lang === 'ru') {
+        options = {
+            closeText: 'Закрыть',
+            prevText: '',
+            nextText: '',
+            currentText: 'Сегодня',
+            monthNames: ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'],
+            monthNamesShort: ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'],
+            dayNames: ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'],
+            dayNamesShort: ['вск', 'пнд', 'втр', 'срд', 'чтв', 'птн', 'сбт'],
+            dayNamesMin: ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'],
+            dateFormat: 'dd.mm.yy',
+            firstDay: 1,
+            isRTL: false
+        };
+    }
+
+    $.datepicker.regional[lang] = options;
+    $.datepicker.setDefaults($.datepicker.regional[lang]);
+
+}());
+
+
+/*** custom functions ***/
+(function($) {
+    // jquery toggle like method
+    $.fn.clicktoggle = function(a, b) {
+        return this.each(function() {
+            var clicked = false;
+            $(this).click(function() {
+                if (clicked) {
+                    clicked = false;
+                    return b.apply(this, arguments);
+                }
+                clicked = true;
+                return a.apply(this, arguments);
+            });
+        });
+    };
+
+})(jQuery);
+/*** end custom ***/
+
+/**
+ * @Input value
+ * Get value with 3 decimal places
+ * pattern
+ * Example: 1000 = 1.000 or 10000 = 10.000
+ */
+A24.getPointerValue = function(value) {
+    var formattedValue = value.toString().replace('.', '');
+
+    if (!formattedValue.match(/\d+$/)) {
+        formattedValue = 0;
+    }
+
+    formattedValue = parseInt(formattedValue, 10);
+
+
+    if( formattedValue.toString().length > 3 ) {
+        formattedValue = (formattedValue / 1000).toFixed(3);
+    } else {
+        formattedValue = formattedValue || '';
+    }
+
+    return formattedValue;
+};
+
+/**
+ * Кастомная функция для показа попапа
+ * @param selector
+ * @param html
+ */
+A24.customPopup = function (selector, html) {
+    $(selector).on('click', function () {
+        //сначала позиционируем окно, потом показываем. да, вот так(
+        $('.popup-block').animate({
+            'display':'block',
+            'opacity':'0'
+        },0,null, function(){
+            $('.popup-block, #fade').fadeIn(function(){
+                console.log($('.popup-block').width(),1);
+                if($(window).width() > 786){
+                    $('.popup-block').css({
+                        'top': /*($(window).height() / 3) - ($('.popup-block').height()) +*/ $(window).scrollTop() + 100,
+                        //'left': ($(window).width() / 2) - ($('.popup-block').width() / 2),
+                        'left':'50%',
+                        'margin-left': (-($('.popup-block').width() / 2)),
+                        'opacity':'1'
+                    });
+                }else if($(window).width() <= 786){
+                    $('.popup-block').css({
+                        'top':  $(window).scrollTop() + 100,
+                        'left':'0',
+                        'margin-left': '15px',
+                        'opacity':'1'
+                    });
+                }
+
+            });
+        });
+
+        $('.popup-block a.close, #fade').on('click', function () {
+            $('.popup-block, #fade').fadeOut(function () {
+                $('.popup-content').empty();
+            });
+            return false;
+        });
+
+        $('.popup-block').css({
+            'top': ($(window).height() / 3) - ($('.popup-block').height()) + $(window).scrollTop(),
+            'left': ($(window).width() / 2) - ($('.popup-block').width() / 2)
+        });
+        //console.log(($(window).width() / 2) - ($('.popup-block').width() / 2));
+        //console.log($(window).width(),$(window).height());
+
+        $('.popup-content').html(html);
+
+        return false;
+    });
+};
+
+/**
+ * Метод для отображения множественных вариантов словоформ
+ * @param count
+ * @param variants
+ * @returns {*|XML|string|void}
+ * example: A24.pluralize(10, {'one': 'Найден %n% краб', 'many': 'Найдено %n% крабов', 'others': 'Найдено %n% крабов'})
+ * TODO: Система нашла {plural|%d заказ|%d заказа|%d заказов|нет заказов} какой-то текст {|то %d}
+ */
+A24.pluralize = function (count, variants) {
+    var result;
+
+    if ( count % 10 === 1 && count % 100 !== 11 ) {
+        result = variants.one;
+    } else if ( count % 10 >= 2 && count % 10 <= 4 && ( count % 100 < 10 || count % 100 >= 20) ) {
+        result = variants.many;
+    } else {
+        result = variants.others || variants.many;
+    }
+
+    return result.toString().replace('%n%', count);
+};
+
+/**
+ * Ставит в фокус в конец элемента с атрибутом contenteditable
+ * @param el
+ */
+A24.placeCaretAtEnd = function (el) {
+    el.focus();
+    if (typeof window.getSelection !== "undefined" && typeof document.createRange !== "undefined") {
+        var range = document.createRange();
+        range.selectNodeContents(el);
+        range.collapse(false);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+    } else if (typeof document.body.createTextRange !== "undefined") {
+        var textRange = document.body.createTextRange();
+        textRange.moveToElementText(el);
+        textRange.collapse(false);
+        textRange.select();
+    }
+};
+
+/**
+ * берет текущую позицию курсора в элементе contenteditable=true и
+ * вставляет туда новый текст
+ * @param element
+ * @returns {number}
+ */
+A24.insertHtmlAfterSelection = function (html) {
+    var sel, range, node;
+    if (window.getSelection) {
+        sel = window.getSelection();
+        if (sel.getRangeAt && sel.rangeCount) {
+            range = window.getSelection().getRangeAt(0);
+            range.collapse(false);
+
+            // Range.createContextualFragment() would be useful here but is
+            // non-standard and not supported in all browsers (IE9, for one)
+            var el = document.createElement("div");
+            el.innerHTML = html;
+            var frag = document.createDocumentFragment(), lastNode;
+            while ( (node = el.firstChild) ) {
+                lastNode = frag.appendChild(node);
+            }
+            range.insertNode(frag);
+        }
+    } else if (document.selection && document.selection.createRange) {
+        range = document.selection.createRange();
+        range.collapse(false);
+        range.pasteHTML(html);
+    }
+};
+
+/**
+ * Укорачивает строку до вида 'оченьДлинноеНазвание...мда.png'
+ * берет первые буквы названия, после многоточий добавляет
+ * в конец последние 7 букв
+ * @param str
+ */
+A24.shortString = function(str, maxLength) {
+    var newStr = str;
+    /** set defaults */
+    if (typeof maxLength === 'undefined') {
+        maxLength = 30;
+    }
+
+    if(str.length > maxLength) {
+        newStr = str.slice(0, maxLength - 10) + '...';
+        newStr += str.slice(str.length - 7, str.length);
+    }
+
+    return newStr;
+};
+
+A24.uploadFile = function (options) {
+    if(typeof options !== 'object') {
+        throw new Error('Options can not be empty');
+    }
+
+    if (typeof options.selector === 'undefined' || typeof options.urlPath === 'undefined') {
+        throw new Error('Params can not be empty');
+    }
+
+    return $(options.selector).fileupload({
+        dataType: 'json',
+        add: function (e, data) {
+            var formData = new FormData();
+            formData.append('file0', data.files[0]);
+
+            if (data.files[0].size > A24.constant.maxFileSize) {
+                alert($.i18n._('Превышен допустимый размер файла'));
+                return;
+            }
+            $.ajax({
+                type: "POST",
+                url: options.urlPath,
+                data: formData,
+                processData: false,
+                contentType: false,
+                dataType: 'JSON',
+                success: function(data) {
+                    console.log('download is successful');
+                    if(typeof options.success !== 'undefined') {
+                        options.success(data);
+                    }
+                }
+            });
+        }
+    });
+};
+
+A24.listener = (function () {
+    $(document).ready(function () {
+        function toogle (a,b) {
+            var target = $(a),
+                className = 'active';
+            target.click(function() {
+                if ($(this).hasClass(className)) {
+                    $(this).removeClass(className);
+                    $(this).parent().find(b).hide();
+
+                } else {
+                    $(this).addClass(className);
+                    $(this).parent().find(b).show();
+                }
+            });
+        }
+
+        //toogle ('.toogle_h','.toogle_h-div');
+        $( "#orderFull__tabs,#orderFull__tabs2" ).tabs();
+
+        $('body').on('click', function (event) {
+            var module;
+            var action;
+            var target;
+
+            try {
+                if ($(event.target).data('action') || $(event.target).closest('[data-action]').data('action')) {
+                    event.preventDefault();
+
+                    if ($(event.target).data('action'))
+                        var action = $(event.target).data('action');
+                    else
+                        var action = $(event.target).closest('[data-action]').data('action');
+                    if (action == 'more') {
+                        var target = $(event.target);
+                    }
+                    else {
+
+                        if ($(event.target).data('id')) {
+                            var target = $(event.target);
+                        } else {
+                            var target = $(event.target).closest('[data-id]');
+                        }
+                    }
+                    var id = target.data('id') || null ,
+                        module = $(event.target).closest('[data-module]').data('module');
+
+                    A24.modules[module].init(module, action, id, target);
+                }
+            }
+            catch (e) {
+                module = $(event.target).closest('[data-module]').data('module');
+            }
+        });
+
+    });
+
+})();
+
+
+/**
+ * @deprecated
+ */
+function CheckboxImitator() {
+    this.initialize = function() {
+        $('input[type=checkbox]').not('[data-nocustom]').each(function(index, element) {
+            var wrapper = $('<div class="checkbox dynamicallyAddedCheckbox">');
+            if(element.checked) {
+                wrapper.addClass('checked');
+            }
+            $(element).wrap(wrapper);
+        });
+    };
+
+    document.onclick = function(event){
+        checkboxHandler(event);
+    };
+
+    function checkboxHandler(event) {
+        var target = event.target;
+        if(target.tagName === 'INPUT' && target.type === 'checkbox') {
+            changeDivStyle(target, target.checked);
+        }
+
+        if(target.tagName === 'DIV' && ~target.className.indexOf('dynamicallyAddedCheckbox')) {
+            var input = target.getElementsByTagName('input')[0];
+
+            // update checkbox checked attribute
+            input.checked = !input.checked;
+
+            // emit change event
+            $(input).trigger('change');
+
+            // change div style
+            changeDivStyle(input, input.checked);
+
+        }
+    }
+
+    function changeDivStyle(target, checked) {
+        switch(checked) {
+            case true:
+                $(target).parent('.checkbox').addClass('checked');
+                break;
+            case false:
+                $(target).parent('.checkbox').removeClass('checked');
+                break;
+        }
+    }
+}
+
+/**
+ * @deprecated
+ */
+function checkbox () {
+
+    $('input[type=checkbox]').not('[data-nocustom]').each(function(index, element) {
+        var testchclass= $(this).attr('class'),
+            chclass= 'checkbox';
+
+        if(testchclass) chclass= testchclass + ' checkbox';
+        if($(this).prop("checked")) chclass = chclass + ' checked';
+        var clickCounter = 0;
+        $(this).wrap($('<div class="'+chclass+'">')
+            .click(function() {
+                var checkbox = $(this).find('input[type=checkbox]');
+
+                if(checkbox.prop("checked")) {
+                    $(this).addClass('checked');
+                }
+                else {
+                    $(this).removeClass('checked');
+                }
+
+                (clickCounter < 2) && checkbox.trigger('click');
+                clickCounter += 1;
+            })).parent().parent().click(function(e) {
+            var target = $(e.target);
+            if (target.hasClass('settings__checkboxWrap')) {
+                target.find('.'+chclass+'').click();
+            }
+        });
+
+    });
+
+}
+
+/**
+ * @deprecated
+ */
+
+function imHeight(element) {
+    var resizeBeginTime = new Date(1, 1, 2000, 12, 0 , 0);
+    var timeout = false;
+    var delta = 200;
+    var windowInitHeight = $(window).height();
+
+    var element = element || $('.im__content'),
+        itemBlock = element.closest('.orders__item');
+
+    function imHeightChange() {
+        var windowHeight = $(window).height(),
+            wraperHeight = element.find('.scroll__wraper').height(),
+            newElementHeight = windowHeight - 320;
+        var ordersHeight = 0;
+
+        if(itemBlock.find('.orders__item-calendary_notice').length > 0){
+            newElementHeight = windowHeight - 370;
+        }
+
+        if(wraperHeight < newElementHeight && wraperHeight > 50/* && $('.response')[0]*/) {
+            element.css('height', wraperHeight + 20);
+        }  else {
+            if(newElementHeight < 150) newElementHeight = 150;
+            element.css('height', newElementHeight);
+        }
+
+        // (ノಠ益ಠ)ノ彡┻━┻
+        if(!element.find('.im__content_message')[0]){
+            // сумма высот списка заказов
+            $('.messages__left_item').each(function (index, el) {
+                ordersHeight += $(el).outerHeight();
+            });
+            // добавляются высоты кнопок навигации
+            ordersHeight += $('.messages__left-moreBottom:visible').outerHeight(true) + $('.messages__left-moreTop:visible').outerHeight(true);
+            if (!$('.messages__left-moreBottom:visible').length) ordersHeight += 40;
+            // вычитаеся высота шапки и панельки для отправки сообщений
+            ordersHeight -= ($('[data-view="orderHeader"]').outerHeight() + $('.im__control').outerHeight());
+            element.css({
+                'min-height': ordersHeight,
+                height: 100
+            });
+        }
+    }
+
+    $(window).resize(function() {
+        if($(window).height() !== windowInitHeight) {
+            console.log('height changed', A24.constant.windowInitHeight, windowInitHeight);
+            resizeBeginTime = new Date();
+            if (timeout === false) {
+                timeout = true;
+                setTimeout(resizeEnd, delta);
+            }
+        }
+    });
+
+    function resizeEnd() {
+        if (new Date() - resizeBeginTime < delta) {
+            setTimeout(resizeEnd, delta);
+        } else {
+            timeout = false;
+            imHeightChange();
+            A24.scroller(element);
+        }
+    }
+
+    imHeightChange();
+}
+
+function updateIm(ims) {
+    ims.each(function() {
+        A24.scroller($(this));
+    });
+}
+
+function changeIcon(status, target) {
+    switch (status) {
+        case 'loader':
+            target.removeClass('settings__loader_load_ok settings__loader_load_no').addClass('settings__loader_load');
+            break;
+
+        case 'ok':
+            target.removeClass('settings__loader_load settings__loader_load_no').addClass('settings__loader_load_ok');
+            break;
+
+        case 'no':
+            target.removeClass('settings__loader_load_ok settings__loader_load').addClass('settings__loader_load_no');
+            break;
+        case 'hide':
+            target.removeClass('settings__loader_load settings__loader_load_ok settings__loader_load_no');
+            break;
+    }
+}
+
+$(document).ready(function () {
+    $('#createSameOrder').click(function(){
+        $("#createSameOrderForm").submit();
+    });
+
+    $('#agencySearch').click(function() {
+        if ($('.agencySearch').val() !== '') {
+            $(this).parent().submit();
+        } else {
+            window.location = '/home/myorders';
+        }
+    });
+
+
+    $('label').click(function() {
+        $(this).parent().find('.checkbox').click();
+    });
+
+    //checkboxFalse();
+    new CheckboxImitator().initialize();
+
+    A24.scroller();
+
+    var ims = $('.im__content');
+
+    if(ims[0]) {
+        updateIm(ims);
+    }
+
+    $('.recommended__item a').on('click',function() {
+        try {
+            yaCounter12075784.reachGoal('new_design_recommended_click');
+        } catch(e) {
+            console.log(e,'new_design_recommended_click');
+        }
+    });
+
+    $('.messages__left_item-orderNumber a').on('click',function(e){
+        e.stopPropagation();
+    });
+
+    var allcount = $('.notice [data-control=wraper]').find('[data-id]').length;
+    if (allcount >= parseInt($('.header__messages-circle2').html())) {
+        $('.notice .notice__item-more').remove();
+    }
+
+
+    var lang = $('html').attr('lang');
+    $('#popupNotAccreditation').dialog({
+        draggable: false,
+        width: 695,
+        autoOpen: false,
+        title: $.i18n._("Пройти тест"),
+        modal: true,
+        buttons:
+            [
+                {
+
+                    text: $.i18n._('Пройти тест'),
+                    'class': 'green',
+                    click: function() {
+                        localStorage.setItem('A24MasterForceQuiz', true);
+                        window.location = '/home';
+                    }
+                },
+                {
+                    text: $.i18n._('Отменить'),
+                    'class':'gray',
+                    click: function() {
+                        $(this).dialog('close');
+                    }
+                }
+            ]
+    });
+
+    $(document).on('click', '#openLiveTex', function(e) {
+        if (typeof liveTex !== 'undefined') {
+            e.preventDefault();
+            if($('.header__profile').length > 0) {
+                var userId = $('.header__profile').attr('data-userid');
+            } else  if($('.header__profile2').length > 0) {
+                var userId = $('.header__profile2').attr('data-userid');
+            } else {
+                userId = 0;
+            }
+
+            /*if(userId != 0) {
+             LiveTex.setConversationAttributes(
+             {"id": userId}
+             );
+             }*/
+            LiveTex.openWelcomeWindow(  {"client_id": userId});
+        } else if (typeof $_Tawk === 'object') {
+            $_Tawk.toggle();
+        }
+        return false;
+    });
+
+    $('.pushWork').click(function() {
+        var workId = $(this).data('work_id');
+        $('#sendFinishedWorkId').val(workId);
+        console.log(workId);
+
+        $('#pushWork').dialog({
+            draggable: false,
+            width: 418,
+            title: $.i18n._("Отправить по почте"),
+            modal: true,
+            buttons:
+                [
+                    {
+                        text: $.i18n._('Отправить'),
+                        'class': 'green',
+                        click: function() {
+                            var workId  = $('#sendFinishedWorkId').val(),
+                                email   = $('#emailToSendFinishedWork').val();
+
+                            $.ajax(
+                                {
+                                    type: "POST",
+                                    url: '/readyworks/sendToMail/' + workId,
+                                    data: { email: email },
+                                    dataType: 'JSON',
+                                    cache: false,
+                                    success: function(msg)
+                                    {
+                                        if(msg.status == 1){
+                                            //как-то показать, что все по красоте
+                                            successUpload();
+                                        }else{
+                                            uploadWithErrors( msg.message ) ;
+                                        }
+                                    }
+                                });
+                        }
+                    },
+                    {
+                        text: $.i18n._('Отменить'),
+                        'class':'gray',
+                        click: function() {
+                            $(this).dialog('close');
+                        }
+                    }
+                ]
+        });
+
+    });
+
+    $('#pushWorkResult').dialog({
+        draggable: false,
+        width: 418,
+        modal: true,
+        autoOpen: false
+    });
+
+
+    $('#deleteMyReadyWorks').dialog({
+        draggable: false,
+        width: 418,
+        modal: true,
+        autoOpen: false,
+        title: $.i18n._("Удалить все работы?"),
+        buttons:
+            [
+                {
+                    text: $.i18n._('Удалить'),
+                    'class': 'green',
+                    click: function() {
+                        $.ajax({
+                            type: "POST",
+                            url: '/ajax/deleteAllReadyWorks',
+                            data: {},
+                            success: function(data) {
+                                location.reload();
+                            }
+                        });
+
+                    }
+                },
+                {
+                    text: $.i18n._('Отменить'),
+                    'class':'gray',
+                    click: function() {
+                        $('#deleteMyReadyWorks').dialog('close');
+                    }
+                }
+            ]
+    });
+
+    $('#deleteAllReadyWorks').click(function(){
+        $('#deleteMyReadyWorks').dialog('open');
+
+    });
+});
+
+
+function successUpload(){
+    var SuccessDialog = $('#pushWorkResult');
+    SuccessDialog.find('label').html($.i18n._('Ваша работа успешно отправлена'));
+
+    $('#pushWork').dialog('close');
+
+    SuccessDialog.dialog({
+        title: $.i18n._("Готовая работа отправлена"),
+        buttons:
+            [
+                {
+                    text: $.i18n._('Ок'),
+                    'class': 'green',
+                    click: function() {
+                        SuccessDialog.dialog('close');
+                    }
+                }
+            ]
+    });
+
+    SuccessDialog.dialog('open');
+}
+
+function uploadWithErrors( message ){
+    var ErrorDialog = $('#pushWorkResult');
+    $('#pushWork').dialog('close');
+
+    //Записываем сообщение об ошибке
+    ErrorDialog.find('label').html(message);
+
+    ErrorDialog.dialog({
+        title: $.i18n._("Возникли ошибки"),
+        buttons:
+            [
+                {
+                    text: $.i18n._('Закрыть'),
+                    'class': 'green',
+                    click: function() {
+                        ErrorDialog.dialog('close');
+                        $('#pushWork').dialog('open');
+                    }
+                },
+                {
+                    text: $.i18n._('Отменить'),
+                    'class':'gray',
+                    click: function() {
+                        $(this).dialog('close');
+                    }
+                }
+            ]
+    });
+    ErrorDialog.dialog('open');
+}
+
+A24.validateRules = {
+    addRules : function(rulesObj) {
+        for (var item in rulesObj) {
+            $('#'+item).rules('add', rulesObj[item]);
+        }
+    },
+    removeRules : function(rulesObj) {
+        for (var item in rulesObj) {
+            $('#'+item).rules('remove');
+        }
+    }
+};
+
+/*window.onerror = function(error, url, linenumber) {
+
+    console.warn(error);
+
+    $.ajax({
+        type: 'post',
+        url: '/ajax/logJsErrors2',
+        data: {
+            url: document.location.href,
+            location: url,
+            linenumber: linenumber,
+            errorData: error
+        },
+        cache: false,
+        dataType: 'JSON'
+    });
+
+}; 01.02.2017*/
+
+(function () {
+
+    function split(val) {
+        var result = [];
+        val = val.toString();
+        for( ;val.length > 3; ) {
+            result.unshift(val.slice(-3));
+            val = val.slice(0, -3);
+        }
+
+        result.unshift(val);
+
+        return result;
+    }
+
+    A24.formatPrice = function (val, suffix) {
+        if(val == 0 || isNaN(parseInt(val))) {
+            return $.i18n._('договорная');
+        }
+
+        var rounded = Math.round(val);
+        suffix = suffix || 'руб';
+        return split(rounded).join(' ') + ' ' + suffix;
+    };
+
+    A24.stat = function (key) {
+        $.post('/ajax/inc/', {v: key});
+        return true;
+    };
+
+} ());

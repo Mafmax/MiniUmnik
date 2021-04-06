@@ -1,0 +1,752 @@
+// JavaScript Document
+$(document).ready(function () {
+    const _orderId = $('.im__content').attr('data-id');
+
+    $('[data-tab="chat"]').on('click', function(){
+        var orderId = $('.im__content').attr('data-id');
+        A24.modules['messages'].actions['get']('messages', 'get', orderId, undefined, undefined, true);
+    });
+
+    $(document).on('mouseenter', '.im__content_message' , function() {
+        if ($(this).hasClass('new_message')) {
+            // убираем зеленую подсветку для всех новых сообщений
+            $(this).closest('.im__content').find('.new_message').removeClass('new_message');
+            // скрываем разделитель для новых сообщений
+            $(this).closest('.im__content').find('.separator').css({'visibility': 'hidden'});
+
+            var orderId = $(this).closest('.im__content').next('.im__control').attr('data-id');
+
+            if (orderId) {
+                $.ajax({
+                    url : '/ajax/deleteUnread/' + orderId,
+                    type : 'POST',
+                    dataType: 'json',
+                    success : function(data) {
+                        A24.modules.messages.actions.getUnreadNotificationCount('messages', 'getUnreadNotificationCount', orderId);
+                    }
+                });
+            }
+        }
+    });
+    //переменная-немного костыль, чтобы при загрузке home для автора и авто клике на первое сообщение(для раскрытия диалога), не было скролла
+    isAutoClickedOnFirstMessage = false;
+    // обработка события прочитанности сообщений
+    if (window.hasOwnProperty('vent')) {
+        window.vent.on('socketEvents', function (message) {
+            if (message.type === 'hasRead') {
+                for (let i = 0; i < message.comment_ids.length; i++) {
+                    $('[data-id="' + message.comment_ids[i] + '"]').removeClass('new_message');
+                }
+            }
+            if (
+                message.type == 'systemMessage' &&
+                $("#commentlist_" + message.orderId).length > 0
+            ) {
+                // дёргать эту штуку можно либо на странице текущего заказа либо на главной странице если открыт нужный заказ
+                A24.modules['messages'].actions['get']('messages', 'get', message.orderId, undefined, undefined, true);
+            }
+            if (
+                (
+                    message.type === 'message'
+                    || message.type === 'assistantMessage'
+                    || message.type === 'check_antispam_comment'
+                ) && message.orderId.toString() === _orderId
+            ) {
+                A24.modules['messages'].actions['get']('messages', 'get', _orderId, undefined, undefined, true);
+            }
+        });
+    }
+});
+
+A24.modules.messages = {
+    nowshow: 0,
+    /**
+     * Где распологается объект
+     * */
+    placed: 0,
+
+    ajaxUrl: {
+        get: '/ajax/getMessageList',
+        getById: '/ajax/getMessageCntInfoByOrderId',
+        getByIdUnread: '/ajax/getUnreadMessageListByOrderId',
+        clean: '/ajax/cleanAllUnreadMessageByOrderId',
+        cleanById: '/ajax/cleanAllUnreadMessageByOrderId'
+    },
+
+    init: function (module, action, id, target) {
+        A24.modules[module].actions[action](module, action, id, target);
+    },
+
+    _cacheMessage: {},
+
+    actions: {
+        more: function (module, action, id, target) {
+            //current = parseInt($('.messages__left-moreBottom').data('current'))
+            var count, data;
+            count = parseInt($('.messages__left').data('ordercount')/7);
+            A24.modules[module].nowshow ++;
+            $('.orderFromBottom').text(7*(A24.modules[module].nowshow + 1) + 1);
+            $('.orderToBottom').text(7*(A24.modules[module].nowshow + 1) + 8);
+            $('.orderFromUp').text(7*(A24.modules[module].nowshow + 1) - 8);
+            $('.orderToUp').text(7*(A24.modules[module].nowshow + 1) - 1);
+            if (A24.modules[module].nowshow >= count) {
+                $('.messages__left-moreBottom').hide();
+                imHeight();
+			}
+            else {
+                $('.messages__left-moreBottom').show();
+                imHeight();
+            }
+            if (A24.modules[module].nowshow == 0) {
+                $('.messages__left-moreTop').hide();
+                imHeight();
+			}
+            else {
+                $('.messages__left-moreTop').show();
+				$('.messages__left-wraper').css('top','55px');
+                imHeight();
+			}
+            data = {offset: A24.modules[module].nowshow};
+            $.ajax({
+                url:'/ajax/getOrderForDashboard',
+                type:'POST',
+                data:data,
+                success:function(data){
+
+                    A24.modules[module].out(module, action , id , $('.messages__left-wraper'),data);
+                }
+            });
+        },
+        less: function (module, action, id, target) {
+            var count, data;
+
+            count = parseInt($('.messages__left').data('ordercount')/7);
+
+            A24.modules[module].nowshow--;
+
+            $('.orderFromBottom').text(7*(A24.modules[module].nowshow + 1) + 1);
+            $('.orderToBottom').text(7*(A24.modules[module].nowshow + 1) + 8);
+            $('.orderFromUp').text(7*(A24.modules[module].nowshow + 1) - 8);
+            $('.orderToUp').text(7*(A24.modules[module].nowshow + 1) - 1);
+
+            if (A24.modules[module].nowshow >= count) {
+                $('.messages__left-moreBottom').hide();
+            } else {
+                $('.messages__left-moreBottom').show();
+            }
+
+            if (A24.modules[module].nowshow === 0) {
+                $('.messages__left-moreTop').hide();
+				$('.messages__left-wraper').css('top','0');
+			}  else {
+                $('.messages__left-moreTop').show();
+            }
+
+            data = {offset: A24.modules[module].nowshow};
+            $.ajax({
+                url:'/ajax/getOrderForDashboard',
+                type:'POST',
+                data:data,
+                success:function(data){
+                    A24.modules[module].out(module, action , id , $('.messages__left-wraper'),data);
+                }
+            });
+        },
+        pusher: function () {
+        },
+        update: function () {
+        },
+        get: function (module, action, id, target, user_id, resetCache) {
+            var el = $('.messages__left_item[data-id="' + id + '"]');
+
+            var successFunc = function (data, resetCache) {
+                if (!user_id) {
+                    user_id = $('#userData').attr('data-userid');
+                }
+
+                var target = $('.scroll__wraper');
+                if (target.length > 1) {
+                    if ($('[data-authorid]').length) {
+                        target = $('[data-authorid="' + user_id + '"] .scroll__wraper');
+                    } else if (+id && $('.im__control[data-id]').length) {
+                        target = $('[data-id=' + id + ']').parent().find('.scroll__wraper');
+                    }
+                }
+                if (typeof data === 'object') data.complain = el.data('complain');
+
+                A24.modules[module].out(module, action, id, target, data);
+
+                // после отправки сообщения окно уезжает вниз http://jira.athr.ru/browse/WEB-5229
+                // костыль для нормального отображения
+                try {
+                    $(document).scrollTop(target.closest('.block').offset().top - 20);
+                } catch (e) {}
+
+                if (typeof data[0] !== 'undefined') {
+                    $('#my_chat .response__main-date').html(data[0].date);
+                }
+
+                if (resetCache) {
+                    data.unreadCount = 0;
+                    A24.modules[module]._cacheMessage[id + '-' + user_id] = data;
+                }
+            };
+
+            if (resetCache || typeof A24.modules[module]._cacheMessage[id + '-' + user_id] === 'undefined') {
+                var data = {order_id: id, start: 1, cnt: 20, user_id: user_id};
+                $.ajax({
+                    url: '/ajax/getMessageList',
+                    type: "POST",
+                    data: data,
+                    dataType: 'json',
+                    success: function (data) {
+                        successFunc(data, true);
+                    }
+                });
+            } else {
+                successFunc(A24.modules[module]._cacheMessage[id + '-' + user_id], false);
+            }
+        },
+        getUnreadNotificationCount: function (module, action, id, target) {
+            $.ajax({
+                url: '/ajax/getUnreadNotificationCount',
+                type: 'POST',
+                data:
+                {
+                    orderId: id
+                },
+                dataType: 'json',
+                success: function (data) {
+                    if (id !== undefined) {
+                        if (data.countUnreadMessageByOrderId !== undefined && data.countUnreadMessageByOrderId != 0){
+                            $('#unreadMessageCnt_' + id).attr('value', data.countUnreadMessageByOrderId)
+                        }else{
+                            $('#unreadMessageCnt_' + id).remove();
+                        }
+
+                    }
+
+                    var data = data.countUnreadMessage;
+                    for (var k in data) {
+                        var element = $('#unreadMessageCnt_' + k);
+                        if (k == 'all') {
+                            $('#unreadMessageCnt_allTop').attr('value', data[k] + data.interest);
+                            if (data[k] + data.interest == 0) {
+                                $('#unreadMessageCnt_allTop').hide();
+                            } else {
+                                $('#unreadMessageCnt_allTop').show();
+                            }
+                        }
+
+                        $(element).attr('value', data[k]);
+                        if (data[k] == 0) {
+                            $(element).hide();
+                        } else {
+                            $(element).show();
+                        }
+                    }
+                }
+            });
+        }
+    },
+
+    out: function (module, action, id, target, data) {
+        var commentsCount, out;
+
+        if (action == 'get') {
+            var dataL = data.length,
+                out = '',
+				block = target.parent();
+
+            if (target.length > 1 && $('[data-authorid]').length) {
+                target = target.get(0);
+            }
+
+            if(+id && $('.im__control[data-id]').length && !$('[data-authorid]').length && A24.modules.messages.placed !== 2) {
+                target = $('[data-id=' + id + ']').parent().find('.scroll__wraper');
+            }
+
+            A24.scroller(target.html(out).parent());
+
+            var topTemplate = A24.templates.topMessages;
+            var el = $('.messages__left_item[data-id="' + id + '"]');
+            $('.messages__left_item').css('background','');
+            el.css('background','#f5f5f5');
+
+            var readable_online = '';
+            if (el.data('online') == 'offline') {
+                readable_online = '<span class="orders__item_bottom__userInfo-time">' + $.i18n._('был в сети') + ' ' + el.data('readable_online') + '</span>';
+            }
+
+            if (id === undefined || id === 'undefined') {
+                A24.errorLogger({comment:'orderId is undefined', data: 'messages.js:212'});
+            }
+
+            var outHeader = A24.modules.messages.replaceOrderHeader({
+                online:el.data('online'),
+                title:el.data('title'),
+                cutomer_nick_name: el.data('cutomer_nick_name'),
+                typename:el.data('type'),
+                categoryname:el.data('category'),
+                readable_online: readable_online,
+                id: id
+            }, topTemplate);
+
+            $('.messages__header').html(outHeader);
+
+            var template = A24.templates[module];
+
+            var messagesData = A24.modules.messages.replacePlaceholderMessages(data, template, target, true);
+            out = messagesData.outString;
+            commentsCount = messagesData.commentsCount;
+
+            A24.modules.messages.updateUserOnline(data, target);
+
+            // изменение содержимого блока с сообщениями
+            A24.scroller(target.html(out).parent());
+            $(A24.templates.MessagesSeparator).insertBefore('.new_message:first');
+
+            target.find('.hide_because_part_pay').click(function(e){
+                //e.stopPropagation();
+                $('#work_unpaid').dialog('open');
+                return false;
+            });
+
+            target.find('.hide_because_part_pay_half').click(function(e){
+                //e.stopPropagation();
+                $('#work_unpaid_half').dialog('open');
+                return false;
+            });
+
+            if(target.closest('.block').length && isAutoClickedOnFirstMessage == false) {
+                $(document).scrollTop(target.closest('.block').offset().top - 70);
+
+            }
+            isAutoClickedOnFirstMessage = false;
+            var orderId;
+
+            if(typeof currentOrderId !== 'undefined' && currentOrderId !== 'undefined') {
+                orderId = currentOrderId;
+            }
+
+            if(orderId === undefined &&  $('#currentOrder').length && $('#currentOrder').attr('data-orderId')) {
+                orderId = $('#currentOrder').attr('data-orderId');
+            }
+
+            if (orderId === undefined && target.length) {
+                orderId = target.attr('data-orderId');
+            }
+
+            if (typeof orderId !== 'undefined') {
+                $('#currentOrder').attr('data-orderId', id);
+                $('#commentlist_'+orderId).attr('id', 'commentlist_'+id);
+                $('#content_message_'+orderId).attr("data-id", id);
+                $('#content_message_'+orderId).attr('id', 'content_message_'+id);
+                if ($(".im__control").length == 1) {
+                    $(".im__control").attr("data-id", id);
+                    $(".im__control").attr('id', 'content_message_' + id);
+                }
+                $("#control_submitter").attr("data-id", id);
+                $("#control_fileupload").attr("data-id", id);
+                $("#control_fileupload").attr("data-stage-int",  el.data('stage-int'));
+                $("#control_fileupload").attr("data-prevented",  el.data('prevented'));
+            }
+            if (data.complain === 1) {
+                $('#control_fileupload').attr('data-js', 'warningOrderAddFile');
+            } else {
+                $('#control_fileupload').attr('data-js', 'orderAddFile');
+            }
+
+            if(orderId === undefined || orderId === 'undefined') {
+                A24.errorLogger({
+                    comment: "$('#currentOrder').attr('data-orderId') - undefined",
+                    data: {file: 'messages.js', line: 243}
+                });
+            }
+
+            // Сокрытие кнопик добавления файлов при ограничениях
+            if( (el.data('stage-int') == 0) && (el.data('prevented') == 1)){
+                $("#control_fileupload").hide();
+            }else{
+                $("#control_fileupload").show();
+            }
+            if(commentsCount !== 0) {
+                var $commentsCount = target.closest('.block').find('.commentCountSpan');
+                if ($commentsCount.length !== 0) {
+                    target.closest('.block').find('.orderFull__imHeader-right_pre').html(' ' + $.i18n._('Сообщений') + ': ');
+                    $commentsCount.show();
+                    $commentsCount.attr('value', commentsCount);
+                } else {
+                    var element = $('.countMessages[data-id='+id+'] .currentCount');
+                    $(element).attr('value', commentsCount);
+                }
+            }
+
+            if (typeof A24.modules.filelist === 'object') {
+                A24.modules.filelist.out(data);
+            }
+
+        } else if(action == 'more' || action == 'less') {
+            out = '';
+            target.html(out);
+            var template = A24.templates['orderlist'];
+            for (var i in data) {
+               out = out + A24.modules.messages.replacePlaceholderOrderList(data[i],template);
+            }
+
+            $('.messages__left-moreBottom').data('current',parseInt($('.messages__left-moreBottom').data('current')) + 7);
+            target.html(out);
+        }
+    },
+
+    // для заказчиков
+    updateUserOnline: function(data, target) {
+        //Получаем место, где используется сообщение
+        A24.modules.messages.getPlasement(target);
+
+        //для моих заказов
+        if(A24.modules.messages.placed == 1 ){
+
+            var changedBlocks = $('.orders__item_bottom__userInfo-login[data-user_id="' + data['customerData']['customer_id'] + '"]');
+            $.each(changedBlocks.closest('.orders__item'), function(){
+
+                var bottomPanel = $(this).find('.orders__item_bottom');
+
+                if(( data['customerData']['online'] == false ) &&
+                    (bottomPanel.find('.orders__item_bottom__userInfo-login').hasClass('online') )){
+
+                    toggleOnlineStatus(bottomPanel.find('.orders__item_bottom__userInfo-login'));
+                    bottomPanel.find('.orders__item_bottom__userInfo').append('<span class="orders__item_bottom__userInfo-time">' + $.i18n._('был в сети') + '  ' + data['customerData']['readable_online'] + '</span>')
+                }
+
+                if(( data['customerData']['online'] == true )
+                    && (bottomPanel.find('.orders__item_bottom__userInfo-login').hasClass('offline') )){
+
+                    toggleOnlineStatus(bottomPanel.find('.orders__item_bottom__userInfo-login'));
+                    bottomPanel.find('.orders__item_bottom__userInfo-time').remove();
+                }
+            });
+
+        }
+        //Главная
+        if(A24.modules.messages.placed == 2 ){
+            var bottomPanel = target.closest('.messages-wraper').find('.messages__header');
+
+            if(( data['customerData']['online'] == false )
+                && (bottomPanel.find('.messages__header-login').hasClass('online') )){
+
+                toggleOnlineStatus(bottomPanel.find('.messages__header-login'));
+            }
+
+            if(( data['customerData']['online'] == true )
+                && (bottomPanel.find('.messages__header-login').hasClass('offline') )){
+
+                toggleOnlineStatus(bottomPanel.find('.messages__header-login'));
+            }
+        }
+        //Главная
+        if(A24.modules.messages.placed == 3 ){
+            var bottomPanel = $('.orderFull-login span');
+
+            if(( data['customerData']['online'] == true )
+                    && (bottomPanel.hasClass('orders__item_bottom__userInfo-time') )){
+
+                //Выполняем необходимые действия
+                bottomPanel
+                    .removeClass('orders__item_bottom__userInfo-time')
+                    .addClass('orderFull-login__group')
+                    .html('Онлайн');
+            }
+
+            if(( data['customerData']['online'] == false )
+                && (bottomPanel.hasClass('orderFull-login__group')  )){
+
+                //Выполняем необходимые действия
+                bottomPanel
+                    .removeClass('orderFull-login__group')
+                    .addClass('orders__item_bottom__userInfo-time')
+                    .html('' + $.i18n._('был в сети') + '  ' + data['customerData']['readable_online']);
+            }
+        }
+        //Функция для измения статуса онлайна
+        function toggleOnlineStatus(elem){
+            elem.toggleClass('offline');
+            elem.toggleClass('online');
+        }
+    },
+
+    getPlasement : function(target){
+        //Мои заказы или календарь
+        if( target.closest('.orders__item').find('.orders__item_bottom').length > 0){
+            A24.modules.messages.placed = 1;
+        }
+
+        //На главной
+        if( target.closest('.messages-wraper').find('.messages__header').length > 0){
+            A24.modules.messages.placed = 2;
+        }
+
+        //Карточка заказа
+        if( target.closest('.block.response').find('.im__content').length > 0){
+            A24.modules.messages.placed = 3;
+        }
+    },
+
+    replaceOrderHeader: function(data,string){
+        string = string.replace('{online}',data['online']);
+        string = string.replace('{title}',data['title']);
+        string = string.replace('{id}',data['id']);
+        string = string.replace('{type}',data['typename']);
+        string = string.replace('{category}',data['categoryname']);
+        string = string.replace('{cutomer_nick_name}',data['cutomer_nick_name']);
+        string = string.replace('{prevented}',data['prevented']);
+        string = string.replace('{readable_online}',data['readable_online']);
+        string = string.replace('{online}',data['online']);
+        return string
+    },
+
+    replacePlaceholderOrderList: function(data,string){
+        string = string.replace(new RegExp('{order_id}','g'),data['order_id']);
+        string = string.replace(new RegExp('{shorttitle}','g'),data['shortTitle']);
+        string = string.replace(new RegExp('{title}','g'),data['title']);
+        string = string.replace('{type}',data['typename']);
+        string = string.replace('{category}',data['categoryname']);
+        string = string.replace('{status}',data['stage']);
+        string = string.replace('{nick}',data['customer_nick_name']);
+        string = string.replace('{prevented}',data['prevented']);
+        string = string.replace('{stage-int}',data['stage_old']);
+        string = string.replace('{online}',data['customer_online']);
+        string = string.replace('{readable_online}',data['customer_readable_online']);
+        return string
+    },
+
+    replacePlaceholderMessages: function(data, string, target, returnCommentsCount) {
+        var outString = '';
+        var lastDate = 0;
+        var text;
+        var out;
+        var result;
+        var userData = $('#userData');
+        var groupId = userData.data('groupid');
+        var userId = userData.data('userid');
+        var commentsCount = data.commentCount;
+        var currentMsgIndex = 1;
+        var unreadCount = data.unreadCount;
+        var readMessageCount = commentsCount - unreadCount;
+        var chatNotices = data.chatNotices
+        var chatNoticesShown = [];
+
+        // флаг для определения принадлежности диалога
+        // (для авторов которые могут просматривать чужие сообщения)
+        var isMyConversation = true;
+
+        // специальное отображение для чужых бесед
+        // где сообщения автора слева, а заказчика справа
+        var specialView;
+
+        if (returnCommentsCount && (typeof returnCommentsCount === 'undefined') ) {
+            returnCommentsCount = false;
+        }
+
+        // если юзер является автором и в данных есть объект с индексом authorData
+        // и если id автора не соответсвует id автора в чате, тогда чат не наш
+        // '+' - это преобразования типа к integer
+        if (groupId === 3 && 'authorData' in data && +userId !== +data.authorData.id) {
+            isMyConversation = false;
+        }
+
+        for (var i in chatNotices) {
+            if (typeof chatNotices[i]['time_ts'] !== 'undefined') {
+                chatNotices[i]['ts'] = (new Date(chatNotices[i]['time_ts'])).getTime();
+            } else {
+                chatNotices[i]['ts'] = 0;
+            }
+        }
+        //Получаем местоположение
+        A24.modules.messages.getPlasement(target);
+
+        for (var i in data) {
+            // нас интересуют только числовой элемент с индексом '0'
+            if(!parseInt(i) && i != '0') {
+                continue;
+            }
+
+            // только сообщения с текстом или приклипленным файлом
+            if((data[i]['text'] == '' || data[i]['text'] == null) && data[i].filehash == null) {
+                continue;
+            }
+
+            data[i]['creation_ts'] = (new Date(data[i]['creation'])).getTime();
+
+            for (var noticeIndex in chatNotices) {
+                if (
+                    typeof chatNoticesShown[noticeIndex] === 'undefined' &&
+                    data[i]['creation_ts'] > chatNotices[noticeIndex]['ts']
+                ) {
+                    chatNoticesShown[noticeIndex] = true;
+                    outString += '<div class="im__content_notice"><span>' +
+                        chatNotices[noticeIndex]['text'] +
+                        '</span></div>';
+                }
+            }
+            if(data[i]['administration']  === 't' ) {
+
+                out = string['admin'];
+
+            } else if (data[i]['assistant']) {
+                out = string['assistant'];
+            } else {
+
+                if (userData.data('userid') == data[i]['user_id']) {
+                    out = string['performer'];
+                } else {
+                    out = string['customer'];
+                }
+            }
+
+            if(data[i]['alert'] == true) {
+                out = out.replace('{comment_style}', 'messages__hidden');
+            } else {
+                out = out.replace('{comment_style}', '');
+            }
+            var messageDate = parseInt(data[i]['creation']);
+
+            if (messageDate > lastDate + 1800) {
+                out = '<div class="im__content-when">' + data[i]['date'] +'</div>' + out;
+            }
+            lastDate = messageDate;
+
+            var myPic, hisPic;
+            /**
+             * warning: далее следует очень много простых комментариев для того чтобы разобраться в коде!
+             * комент почти на каждой строке, потому для более точной очевидности
+             */
+            // если чужой чат и id в сообещении не равно id автора, то это закачик
+            // поэтому показываем его сообщения справа
+            specialView = (!isMyConversation && +data[i]['user_id'] !== +data.authorData.id);
+            out = out.replace('{comment_id}', data[i]['id']);
+
+            // если заказчик
+            if (groupId == 2) {
+                // то берем свою аву из customerData
+                // и аву автора берем из authorData
+                myPic = data['customerData']['pic'];
+                hisPic = data['authorData']['pic'];
+            // если автор
+            } else if (groupId == 3) {
+                // тогда все наоборот
+                myPic = data['authorData']['pic'];
+                hisPic = data['customerData']['pic'];
+
+                // если чужой чат, то слева у нас заказчик, а справа автор
+                if (!isMyConversation) {
+                    myPic = data['customerData']['pic'];
+                    hisPic = data['authorData']['pic'];
+                }
+            }
+
+            if (userId == data[i]['user_id'] || specialView) {
+                out = out.replace('{his}','my');
+                out = out.replace('{online}','');
+                out = out.replace('{readable_online}','');
+                out = out.replace('{avatar}', myPic);
+            } else if (userId != data[i]['user_id']) {
+                out = out.replace('{his}','his');
+                out = out.replace('{avatar}', hisPic);
+
+                //Костыль для того чтобы на главной не выводился онлайн
+                if( A24.modules.messages.placed == 2) {
+                    out = out.replace('{online}','');
+                    out = out.replace('{readable_online}','');
+                }
+
+                if(groupId == '2'){
+                    if(data['authorData']['online'] == false) {
+                        out = out.replace('{online}','offline');
+                        out = out.replace('{readable_online}','<span class="im__content_message-offline">' + $.i18n._('был в сети') + '  ' + data['authorData']['readable_online'] + '</span>')
+                    }
+                    else {
+                        out = out.replace('{online}','online');
+                        out = out.replace('{readable_online}','')
+                    }
+                } else {
+                    if(data['customerData']['online'] == false) {
+                        out = out.replace('{online}','offline');
+                        out = out.replace('{readable_online}','<span class="im__content_message-offline">' + $.i18n._('был в сети') + '  ' + data['customerData']['readable_online'] + '</span>')
+                    }
+                    else {
+                        out = out.replace('{online}','online');
+                        out = out.replace('{readable_online}','')
+                    }
+                }
+            }
+
+            if (userId != data[i]['user_id'] && commentsCount > 0 && currentMsgIndex > readMessageCount) {
+                out = out.replace('{new}',' new_message');
+            } else {
+                out = out.replace('{new}','');
+            }
+
+            if (userId != data[i]['user_id']) {
+                out = out.replace('{nick_name}',data[i]['nick_name'])
+            } else {
+                out = out.replace('{nick_name}',data[i]['nick_name'])
+            }
+
+            text = data[i]['text'];
+            if(data[i]['text'] == '' || data[i]['text'] == null /*&& data[i].bid == null*/) {
+                out = out.replace('im__content_message-text','hidden')
+            }
+
+            out = out.replace('{text}',text);
+
+            var file = '';
+
+            if (data[i].filehash != null) {
+                file += '<div class="fileIm"><span class="file_name_im">' + data[i]['filename'] + '</span>';
+
+                if ($('#userData').data('userid') == data[i]['user_id'] && groupId == 3) {
+                    file += '<div class="fileIm__type">';
+                    if(data[i]['status'] == '1') {
+                        file += $.i18n._('Окончательный');
+                    } else {
+                        file += $.i18n._('Промежуточный');
+                    }
+
+                    file += '</div>';
+                }
+                if (!!data[i]['filehash']) {
+                    file += '<a class="download" data-js="file-access" data-file="' + data[i]['filehash'] +'" href="/file/' + data[i]['filehash'] + '">' + $.i18n._('Скачать') + '</a>';
+                } else if (!!data[i]['fileHalfPeriod']) {
+                    file += '<a class="download hide_because_part_pay_half" href="#">' + $.i18n._('Скачать') + '</a>';
+                } else {
+                    file += '<a class="download hide_because_part_pay" href="#">' + $.i18n._('Скачать') + '</a>';
+                }
+                file += '</div>';
+            }
+            out = out.replace('{file}',file);
+            outString += out;
+            currentMsgIndex++;
+        }
+        // если сообщения закончились надо всё-таки вывести нотайсы
+        for (var noticeIndex in chatNotices) {
+            if (typeof chatNoticesShown[noticeIndex] === 'undefined') {
+                chatNoticesShown[noticeIndex] = true;
+                outString += '<div class="im__content_notice"><span>' +
+                    chatNotices[noticeIndex]['text'] +
+                    '</span></div>';
+            }
+        }
+        if (returnCommentsCount) {
+            result = {
+                'outString': outString,
+                'commentsCount': commentsCount
+            }
+        } else {
+            result = outString;
+        }
+        return result;
+    }
+};
+
+

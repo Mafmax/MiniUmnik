@@ -1,0 +1,21 @@
+$(function () {
+    $('body').on('click', '.tabs_list li', function() {
+        var el = $(this),
+            parent = el.parent().parent(),
+            tabId = '.tabBlock_' + el.data('tab');
+
+        if(!el.hasClass('empty')) {
+            parent.find('.tabs_list li.active').removeClass('active');
+            el.addClass('active');
+
+            parent.find('.tabs__placeholder .active').removeClass('active');
+            $(tabId).addClass('active');
+
+        } else {
+            alert($.i18n._('Вкладка пуста'));
+        }
+    });
+
+    A24.customPopup('.showAllSpecs', $('#specsList').html());
+    A24.customPopup('.showAllWorks', $('#worksList').html());
+});

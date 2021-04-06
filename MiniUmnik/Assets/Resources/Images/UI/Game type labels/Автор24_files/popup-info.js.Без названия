@@ -1,0 +1,43 @@
+/** 
+* @package Author 24
+* @version 1.0
+* @author Andrey Garbuzov garbuzzz@gmail.com
+*/
+
+// Всплывающие Info окошко
+
+(function($) {
+	
+	$.fn.extend({
+		
+		popupInfo : function(position, text, callback) {
+			
+			return this.each(function() {
+				$(this).click(function(event) {
+					if ($(this).children('.popup-info').length === 0) {
+						var element = $('<div class="popup-info"/>');
+						var arrow = $('<div class="arrow"/>');
+						var btnClose = $('<a class="btn-close"></a>').click(function() {
+							element.fadeOut();
+						});
+
+						event.stopPropagation();
+						
+						$('body').click(function(){
+							element.fadeOut();
+						});
+
+						element.html(text).append(arrow).append(btnClose).addClass(position).fadeIn().css('left',$(this).position().left);
+							
+						$(this).css({'position':'relative','z-index':'9'}).after(element);
+						if (callback) {
+							callback();
+						}
+					} else {
+						$(this).children('.popup-info').fadeIn();
+					}
+				});
+			});
+		}
+	});
+})(jQuery);

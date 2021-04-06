@@ -22,8 +22,9 @@ public class AttentionLevelDesigner : LevelDesigner
         CurrentPair = Instantiate(Pairs[currentLevel]).GetComponent<AttentionPair>();
         CurrentPair.OnCompleted += () => SendStatistics(true, "Найдены все отличия"); ;
         CurrentPair.OnAnswered += OnAnswered;
+        OnAnswered();
         CurrentPair.transform.position = answerAnchor.position + new Vector3(0,5.5f,5);
-        StartTimer(60-currentLevel*2);
+        StartTimer(180-currentLevel*2);
         yield return null;
     }
     
@@ -46,6 +47,6 @@ public class AttentionLevelDesigner : LevelDesigner
     }
     private void OnAnswered()
     {
-        
+        question.text = $"Найди все отличия. Осталось {10-CurrentPair.CurrentAnswered}";
     }
 }

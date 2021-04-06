@@ -1,0 +1,1032 @@
+var fixMessageBlock, fUpload;
+
+$(document).ready(function() {
+    var _file = $('[data-js="fileupload"]');
+    var MessageUI = {
+        file: _file.length ? _file : createFileElement(),
+        popup: $("#select_file"),
+        fileStatus: 0
+    };
+    var filestatus = 0;
+    var userData = $('#userData');
+    var groupId =  userData.attr('data-groupid');
+    // данные файла добавленного через драг-н-дроп или копипаст
+    var pasteFileHolder = [];
+
+    initFileUpload(groupId);
+
+    MessageUI.popup.dialog({
+        width: 'auto',
+        autoOpen: false,
+        modal: true,
+        buttons: [{
+            text: $.i18n._("Выбрать файл"),
+            tabIndex: -1,
+            click: function () {
+                MessageUI.file.click();
+            }
+        }, {
+            text: $.i18n._("Отменить"),
+            click: function() {
+                MessageUI.popup.dialog('close');
+            },
+            'class':'gray'
+        }],
+        open: function(event, id) {
+            MessageUI.popup.find('.error').text('');
+
+        },
+        create: function( event, ui ) {
+
+            MessageUI.popup.find('.error').text('');
+
+            var tabs = $(this).find('.select_file__tabs-item');
+            var alertBlock = $('.select_file__alert');
+
+            tabs.on('click', function() {
+                if (groupId == 2) return;
+                if ($(this).attr('data-js') === 'consultOrder') return;
+
+                if($(this).hasClass('t1')) {
+                    MessageUI.fileStatus = 0;
+                    alertBlock.hide();
+                    toggle($(this));
+                } else {
+                    MessageUI.fileStatus = 1;
+                    alertBlock.show();
+                    toggle($(this));
+                }
+
+                function toggle(element) {
+                    if(!element.hasClass('active_ptab')) {
+                        element.addClass('active_ptab');
+                        if(element.index() == 0) $(tabs[1]).removeClass('active_ptab');
+                        else $(tabs[0]).removeClass('active_ptab');
+                    }
+                }
+
+            });
+        }
+    });
+
+    var formatSize = function (size) {
+        if(size < 1024) {
+            return size + ' B';
+        } else if(size < 1048576) {
+            return (size / 1024).toFixed(2) + ' KB';
+        } else {
+            return (size / 1048576).toFixed(2) + ' MB';
+        }
+    };
+
+    $(document).on('click', ".warning__orderFile, [data-js=orderAddFile], [data-js=add-file]", function (e) {
+        fixMessageBlock = $(this).closest(".offer-item").find(".im__control[data-authorid]");
+        if($(this).hasClass('purgeClick')) {
+            return;
+        }
+
+        var short_popup = $(this).attr('data-stage-int') == 0;
+        var isPrevented = $(this).attr('data-prevented') == 1;
+
+        e.preventDefault();
+        $('#fileStatus').val(0);
+        if ($(e.target).attr('id') == 'downloadFinishFile') {
+            $('#fileStatus').val(1);
+        }
+        MessageUI.popup.attr("data-id", $(this).attr("data-id"));
+
+        var title;
+        //для заказчиков нет диалогового окна и соответственно нет тайтла. сразу выбор файла
+        if ((groupId == 2 || short_popup || isPrevented) === false) {
+            title = $.i18n._('Выберите тип работы который вы хотите загрузить');
+            $("#select_file .select_file__tabs").show();
+        }
+
+        //для заказчиков нет диалогового окна. сразу выбор файла
+        if(groupId == 2 || short_popup) {
+            MessageUI.file.click();
+        } else {
+            MessageUI.popup.dialog("option", "title", title);
+            MessageUI.popup.dialog('open');
+            $('.t1').trigger('click');// чтобы по умолчанию был промежуточный тип файла выбран
+        }
+    });
+
+    var paymentLock = false;
+
+    var selectMethod = $('#select_method');
+
+        selectMethod.dialog({
+            width: 'auto',
+            title: $.i18n._('Выберите тип оплаты'),
+            modal: true,
+            autoOpen: false,
+            draggable: false,
+            open: function(event, id) {
+                selectMethod.find('.error').text('');
+
+                var orderId = selectMethod.attr('data-order_id');
+                var authorId = selectMethod.attr('data-author_id');
+
+                selectMethod.dialog({
+                    buttons: [
+                        {
+                            text:$.i18n._("Отмена"),
+                            'class':'gray selectMethod-button',
+                            click: function() {
+                                $(this).dialog('close');
+                            }
+                        },
+                        {
+                            text:$.i18n._("Выбрать тип оплаты"),
+                            'class':'green selectMethod-button',
+                            'id': 'buttonPartPaySend',
+                            click: function() {
+                                if (paymentLock) return;
+                                var partial = 0;
+                                if(selectMethod.find('.t2').hasClass('active_ptab')) {
+                                    partial = 1;
+                                }
+
+                                if (partial && 1 * selectMethod.data('not_phone') == 1) {
+                                    $('#phoneConfirmBlock')
+                                            .attr('data-part_pay_is_customer', 1)
+                                            .attr('data-part_pay_author', selectMethod.data('author_id'))
+                                            .dialog({title: $.i18n._('Для оплаты в рассрочку необходимо подтвердить номер телефона')})
+                                            .dialog('open');
+
+                                    selectMethod.dialog('close');
+                                    return false;
+                                }
+
+                                var tmpl = A24.template('views/customer/payment/partPayPost.ejs', {
+                                    orderId: orderId,
+                                    authorId: authorId,
+                                    partial: partial
+                                });
+
+                                if ($('#partPayForm').length) {
+                                    $('#partPayForm').remove();
+                                }
+
+                                $('body').append(tmpl);
+                                $('#partPayForm').submit();
+                                paymentLock = true;
+                            }
+                        }
+                    ]
+                });
+            },
+
+            create: function( event, ui ) {
+
+                selectMethod.find('.error').text('');
+
+                var tabs = $(this).find('.select_file__tabs-item');
+
+                // слишком много обработчиков для этих табов...
+                // поэтому обезопасимся от выполнения стороннего кода
+                tabs.off();
+
+                tabs.on('click', function() {
+                    if(groupId == 3) {
+                        return;
+                    }
+                    // если один из табов задизейблен
+                    if($(this).hasClass('disabled-tab')) {
+                        return;
+                    }
+
+                    if($(this).hasClass('t1')) {
+                        //alertBlock.hide();
+                        toogle($(this));
+                    } else {
+                        //alertBlock.show();
+                        toogle($(this));
+                    }
+
+                    function toogle(element) {
+                        if(!element.hasClass('active_ptab')) {
+                            element.addClass('active_ptab');
+                            if(+element.index() === 0) $(tabs[1]).removeClass('active_ptab');
+                            else $(tabs[0]).removeClass('active_ptab');
+                        }
+                    }
+
+                });
+
+            }
+        });
+
+
+    var work_unpaid = $('#work_unpaid');
+    work_unpaid.dialog({
+        width: 'auto',
+        title: $.i18n._('Работа не оплачена!'),
+        modal: true,
+        autoOpen: false,
+        draggable: false,
+        buttons: [
+            {
+                text:$.i18n._("Отмена"),
+                'class':'gray selectMethod-button',
+                click: function() {
+                    $(this).dialog('close');
+                }
+            },
+            {
+                text:$.i18n._("завершить оплату"),
+                'class':'green selectMethod-button',
+                click: function() {
+                    var orderId = work_unpaid.data('order_id');
+                    window.location = '/finance/finalPaymentOrder/' + orderId;
+                }
+            }
+        ],
+
+        open: function(event, id) {
+
+        },
+
+        create: function( event, ui ) {
+
+        },
+
+        onClick: function (){
+
+        }
+    });
+
+    var confirmStartWork = $('[data-js="confirmStartWork"]'),
+        authorQueryAccept = $('[data-js="author-query-accept-button"]');
+    confirmStartWork.dialog({
+        width: 800,
+        title: $.i18n._('Подтвердить начало работы'),
+        modal: true,
+        autoOpen: false,
+        draggable: false,
+        buttons: [
+            {
+                text:$.i18n._("Отмена"),
+                'class':'gray selectMethod-button',
+                click: function() {
+                    $(this).dialog('close');
+                }
+            },
+            {
+                text:$.i18n._("Подтвердить"),
+                'class':'green selectMethod-button',
+                'data-testid': 'confirmStartWorkPopUp',
+                click: function() {
+                    var orderId = authorQueryAccept.data('order_id');
+                    window.location = '/order/authorqueryaccept/' + orderId;
+                }
+            }
+        ],
+        open: function(event, id) { },
+        create: function( event, ui ) { },
+        onClick: function () { }
+    });
+    authorQueryAccept.click(function(e){
+        confirmStartWork.dialog('open');
+        return false;
+    });
+
+    var warningOrderAddFileBlock = $('[data-js="warningOrderAddFile__block"]');
+    warningOrderAddFileBlock.dialog({
+        width: 800,
+        title: $.i18n._('Внимание!'),
+        modal: true,
+        autoOpen: false,
+        draggable: false,
+        buttons: [
+            {
+                text:$.i18n._("Отмена"),
+                'class':'gray selectMethod-button',
+                click: function() {
+                    $(this).dialog('close');
+                }
+            },
+            {
+                text:$.i18n._("Продолжить"),
+                'class':'green selectMethod-button warning__orderFile',
+                'data-js':'warning_order_btn',
+                click: function() {
+                    $(this).dialog('close');
+                }
+            }
+        ],
+        open: function(event, id) { },
+        create: function( event, ui ) { },
+        onClick: function () { }
+    });
+    $(document).on('click', '[data-js=warningOrderAddFile]', function(e){
+        warningOrderAddFileBlock.dialog('open');
+        $('[data-js=warning_order_btn]').attr('data-id', $(this).attr('data-id'));
+        return false;
+    });
+
+
+    var work_unpaid_half = $('#work_unpaid_half');
+    work_unpaid_half.dialog({
+        width: 'auto',
+        title: $.i18n._('Работа не оплачена!'),
+        modal: true,
+        autoOpen: false,
+        draggable: false,
+        buttons: [
+            {
+                text:$.i18n._("Отмена"),
+                'class':'gray selectMethod-button',
+                click: function() {
+                    $(this).dialog('close');
+                }
+            },
+            {
+                text:$.i18n._("завершить оплату"),
+                'class':'green selectMethod-button',
+                click: function() {
+                    var orderId = work_unpaid_half.data('order_id');
+                    window.location = '/finance/finalPaymentOrder/' + orderId;
+                }
+            }
+        ]
+    });
+
+    var gData;
+    var isFileAdd = false;
+    var messageList = [];
+    var fileList = [];
+
+    var smallOrderPopup = $("#smallOrderPopup");
+    smallOrderPopup.dialog({
+        width: 'auto',
+        modal: true,
+        draggable: false,
+        autoOpen: false,
+        buttons:
+            [
+                {
+                    text: $.i18n._('Оплатить'),
+                    class: 'green',
+                    click: function () {
+                        $(this).dialog('close');
+                    }
+                }
+            ]
+    });
+
+    $(document).on('click', '.im__control-button', function () {
+        var messageBlock = $(this).parent();
+
+        var messageData = getCurrentMessageData(messageBlock);
+        if (isFileAdd) {
+            MessageUI.file.fileupload({
+                formData: { fileStatus:$("#fileStatus").val(), message:messageData.message, order_id:messageData.order_id }
+            });
+
+            gData.submit();
+
+        } else {
+            if (
+                pasteFileHolder[messageData.order_id] == null
+                &&
+                messageData.message === ''
+            ) {
+                alert ($.i18n._("Введите сообщение или прикрепите файл"));
+            }
+            if (pasteFileHolder[messageData.order_id] != null) {
+                // если есть дропнутый файл надо его отправить
+                // но одновременно два сообщения мы отправить не можем
+                // потому если есть текст то отправляем файл через секунду
+                setTimeout(
+                    function() {
+                        pasteFileHolder[messageData.order_id].submit();
+                    },
+                    (messageData.message !== '') ? 1100 : 0
+                );
+            }
+            if (messageData.message !== '') {
+                $.post( "/ajax/addCommentToOrder", messageData , 'json' ).done(
+                    function(data) {
+                        data  = jQuery.parseJSON( data, true);
+
+                        if (data.status == 1){
+                            if (filestatus == 1) {
+                                location.reload();
+                            }
+                            $('#commentlist_' + messageData.order_id + '[data-authorid=' + messageData.toAuthorId + '] .scroll__wraper').append(waitMessage);
+                            cleanCurrentMessageData(messageBlock);
+                            reloadMessageList(messageData.order_id, messageData.toAuthorId, true);
+                        } else if (data.status === 0){
+                                if( data.error !== undefined  ){
+                                    showDefaultMessage($.i18n._(data.popup ? 'Произошла ошибка' : 'Внимание'), data.error);
+                                }
+                            }
+                    }).fail(function() {
+                        alert ($.i18n._("Ошибка при отправке"));
+                    });
+            }
+        }
+    });
+    $(document).on('click', '.offer-item-chooseAuthor', function(e) {
+        e.preventDefault();
+
+        var authorName = $(this).prev().find('.offer-item-header-user-name > .name-wraper').text();
+        var workName = $('.findOrder').find('h1:first').text();
+
+        var bid = $(this).data('bid');
+        var authorId = $(this).attr('data-authorId');
+        var orderId = $(this).attr('data-orderId');
+        var taxPercent = $(this).data('tax');
+        var tax = Math.ceil(bid*(taxPercent / 100));
+
+        var payWithTax = bid + tax; //Math.ceil(bid*(taxPercent / 100));
+        var allowPartPay = $(this).attr('data-partPay');
+        var partPayPercent = $(this).attr('data-partPayPercent');
+        var partPayPercentCommission =  $(this).attr('data-partPayPercentCommission');
+        var overLimitPartPay =  $(this).attr('data-overLimitPartPay');
+        var notPhone =  $(this).attr('data-not_phone');
+        var clicked = false;
+
+        if (allowPartPay && !overLimitPartPay) {
+            var partFirst = Math.round(payWithTax * partPayPercent / 100);
+            var partFinish = payWithTax - partFirst;
+            var ourCommission = Math.round(bid/100 * partPayPercentCommission);
+
+            $('#select_method .popup_part_first').html(partFirst);
+            $('#select_method .popup_part_finish').html(partFinish + ourCommission);
+
+            $('#select_method .popup_price').html(bid);
+            $('#select_method .popup_tax').html(tax);
+            $('#select_method .popup_summ').html(payWithTax);
+
+            $('#select_method .popup_part_finish_commission').html(ourCommission);
+
+            $('#select_method .disable-partPay').click(function (e) {
+                e.stopPropagation();
+                var container = $(this).closest('.select_file__tabs-item');
+                var userId = container.data('user');
+                $.ajax({
+                    url: '/ajax/changePartPay',
+                    type: 'post',
+                    data: {
+                        userId: userId,
+                        enable: 0
+                    },
+                    dataType: 'json',
+                    success: function (data) {
+                        if (!!data['status'] && data['status'] == 'ok') {
+                            container.hide();
+                            container.next().show();
+                        } else {
+                            this.error(data);
+                        }
+                    },
+                    error: function (data) {
+
+                    }
+                });
+                return false;
+            });
+
+            selectMethod.attr('data-order_id', orderId);
+            selectMethod.attr('data-author_id', authorId);
+            selectMethod.attr('data-not_phone', notPhone);
+            selectMethod.dialog('open');
+        } else {
+            $('#chooseAuthor .popup_price').html(bid);
+            $('#chooseAuthor .popup_tax').html(tax);
+            $('#chooseAuthor .popup_summ').html(payWithTax);
+
+            $.ajax({
+                type: "POST",
+                url: '/ajax/UserBalance',
+                data: {order: 1, sum: payWithTax},
+                dataType: 'JSON',
+                success: function(data)
+                {
+                    var showWindow = function() {
+                        clicked = false;
+                        if(!!data['value'] && data['value'] >= payWithTax) {
+                            $('#chooseAuthor').dialog({
+                                width: 703,
+                                title: $.i18n._("Выбрать автора"),
+                                modal: true,
+                                draggable: false,
+                                open: function() {
+                                    var popup = $('#chooseAuthor');
+
+                                    popup.find('#popup_author_name')
+                                        .text($.trim(authorName));
+                                    popup.find('#popup_work_name')
+                                        .text(workName);
+                                },
+                                buttons:
+                                    [
+                                        {
+                                            text: $.i18n._('Отмена'),
+                                            class:'gray',
+                                            id: 'chooseAuthorCancel1',
+                                            click: function() {
+                                                $(this).dialog('close');
+                                            }
+                                        },
+                                        {
+                                            text: $.i18n._('Да, выбрать этого автора'),
+                                            id: 'chooseAuthorOk1',
+                                            class : 'active green on-outline',
+                                            click: function() {
+                                                if (clicked) return;
+                                                window.location = '/finance/deductmeganew/' + orderId +'/' + authorId;
+                                                clicked = true;
+                                            }
+                                        }
+                                    ]
+                            });
+                            $('#chooseAuthor').parent().find('button.green').focus();
+                        } else {
+                            if (clicked) return;
+                            window.location = '/finance/deductmeganew/' + orderId +'/' + authorId;
+                            clicked = true;
+                        }
+                    };
+
+                    if (!!data['deficit'] && data['deficit'] != 0) {
+                        smallOrderPopup.on("dialogclose", showWindow);
+                        $('#smallOrderMissing').html($.i18n.sum_format(data['deficit']));
+                        $('#availableVirtualPercent').html(data['percent']);
+                        smallOrderPopup.dialog('open');
+                    } else {
+                        showWindow();
+                    }
+                }
+            });
+        }
+
+    });
+
+    $('.hide_because_part_pay').click(function(e){
+        work_unpaid.dialog('open');
+        return false;
+    });
+
+    $('.hide_because_part_pay_half').click(function(e){
+        work_unpaid_half.dialog('open');
+        return false;
+    });
+
+    ctrlEntenr();
+
+    (function(){
+        var params = getUrlVars();
+        var orderId = params['orderId'];
+        var authorId = params['authorId'];
+        var bid = params['bid'];
+
+        if (orderId && authorId && bid) {
+            jQuery('a.offer-item-chooseAuthor[data-orderid="' + orderId + '"][data-authorid="' + authorId + '"][data-bid="' + bid + '"]').click();
+        }
+    })();
+
+    const changeCheckboxText = ($node, isChecked) => $node.next().html(isChecked ? 'Снять выделение' : 'Выбрать все');
+
+    // прячет кнопку скачать выбранные файлы
+    $(document).bind('uploadedFilesUpdated', function() {
+
+        var forms = $('[data-js=selectFiles]');
+
+        // перебираем все формы с файликами и чекаем длинну файликов
+        $.each(forms, function(key, form) {
+
+            var $form = $(form);
+            const $chooseAllCheckbox = $form.find('.choose-all-checkbox');
+            var button = $form.find('[data-js=selectFilesButton]');
+            var files = $form.find('[data-js=fileItem]');
+            // если мало файлов, прячем кнопку групповой скачки
+            button[files.length < 1 ? 'hide' : 'show']();
+            // toggle чекбокс "Выбрать все"
+            const countChecked = $form.find('input[type=checkbox]:checked').not('.choose-all-checkbox').length;
+            $chooseAllCheckbox.prop('checked', countChecked === files.length);
+            changeCheckboxText($chooseAllCheckbox, countChecked === files.length);
+            // если ничего не чекнуто, деактивируем кнопку
+            var disabled = countChecked < 1 ? 'addClass' : 'removeClass';
+            button[disabled]('m-selectFiles__downloadSelected--disabled');
+        });
+
+    });
+
+    const selectFilesForms = $('[data-js=selectFiles]');
+    $.each(selectFilesForms, function(key, form) {
+        const $form = $(form);
+        const $downloadAllBtn = $form.find('.m-selectFiles__downloadSelectedAll');
+        const $chooseAllCheckbox = $form.find('.choose-all-checkbox');
+        $downloadAllBtn.on('click', function () {
+            $form.submit();
+        });
+        $chooseAllCheckbox.on('change', function () {
+            const isChecked = $(this).prop('checked');
+            changeCheckboxText($(this), isChecked);
+            $form.find('input[type=checkbox]').prop('checked', isChecked);
+        })
+    });
+
+    // валидация: не даём кликнуть по кнопке, если не выбрано более одного файла
+    $(document).on('change', '[data-js=selectFiles] input[type=checkbox]', function() {
+        $(document).trigger('uploadedFilesUpdated');
+    });
+
+// этот шаблон необходим для сообщения
+var messageTemplate  = _.template(
+    '<div class="im__content_message my ">'+
+    '<div class="fileIm">'+
+    '<span class="file_name_im"><%= name %></span>'+
+    '<div class="fupload__stat fupload__stat--inMessage" data-hook-upload="progressContainer">'+
+    '<div class="fupload__statInner" data-hook-upload="progress"></div>'+
+    '</div>' +
+    '<span class="fupload__closeIcon fupload__closeIcon--inMessage" data-hook-upload="remove"></span>' +
+    '</div>' +
+    '</div>');
+
+    // шаблон иконки файла в инпуте
+    // первый span нужен чтобы в firefox можно было этот элемент удалять
+    // второй span нужен чтобы курсор для ввода текста был виден как положено
+    var inputFileItemTemplate = _.template(
+        '<span><div class="im__content_file_item" contenteditable="false">' +
+        '<%= fileName %>' +
+        '</div></span><span></span>'
+    );
+
+    //вынесено в отдельную ф-ю
+    function initFileUpload(groupId) {
+
+        if (fUpload) return;
+
+        var tplContainer = $('#newFileListItemTemplate');
+        if (!tplContainer.length) return;
+        var tpl = tplContainer.html();
+        var template = _.template(tpl);
+        var messageData;
+
+        fUpload = MessageUI.file.fileupload({
+            url: '/ajax/addCommentToOrder',
+            dataType: 'json',
+            formData: function() {
+                return [{
+                    name: 'fileStatus',
+                    value: messageData.filestatus
+                }, {
+                    name: 'order_id',
+                    value: messageData.order_id
+                }, {
+                    name: 'toAuthorId',
+                    value: messageData.toAuthorId
+                }];
+            },
+            maxFileSize: A24.constant.maxFileSize,
+            dropZone: $(".im__control"),
+            pasteZone: $(".im__control"),
+            progress: function(e, data) {
+                var progress = parseInt(data.loaded / data.total * 100, 10);
+                $(data.context).find('[data-hook-upload=progress]').css('width', progress + '%');
+                $(data.contextClone).find('[data-hook-upload=progress]').css('width', progress + '%');
+                $(data.msgContext).find('[data-hook-upload=progress]').css('width', progress + '%');
+            },
+            add: function(e, data) {
+                var alerts = [];
+                var ext = data.originalFiles[0].name.split('.').pop();
+                if (A24.constant.acceptedExt.indexOf(ext.toLowerCase()) < 0) {
+                    alerts.push($.i18n._('Загрузка этого типа файлов не допускается.'));
+                }
+                if (data.originalFiles[0]['size'] > A24.constant.maxFileSize) {
+                    alerts.push($.i18n._('Слишком большой файл.'));
+                }
+                if (alerts.length > 0) {
+                    $('#select_file .error').html('');
+                    for (var i = 0; i < alerts.length; i++) {
+                        $('#select_file .error').append('<p>' + alerts[i] + '</p>');
+                    }
+                } else {
+                    // Если файл отправляется кривой файл с плохим расширением, не стоит закрывать окно,
+                    // так как в нем еще показывается сообщение об ошибке
+                    // MessageUI.popup.dialog('close');
+                    // автоотправка только при нормальном добавлении
+
+                    if (e.delegatedEvent.type != 'paste' && e.delegatedEvent.type != 'drop') {
+                        data.submit();
+                    }
+                }
+                MessageUI.file = $(this);
+            }
+        });
+
+        fUpload.on('fileuploadsubmit', function(e, data) {
+            if (data.files[0]['size'] <= A24.constant.maxFileSize) {
+                if (e.delegatedEvent.type == 'change') {
+                    var dataId = MessageUI.popup.attr("data-id");
+                    if (dataId == null && typeof currentOrderId !== 'undefined') {
+                        dataId = currentOrderId;
+                    }
+                } else {
+                    var dataId = $(e.delegatedEvent.target).closest(".im__control").attr("data-id");
+                    // при копипасте файла статус всегда промежуточный
+                    MessageUI.fileStatus = 0;
+                }
+
+                // тк у нас несколько вкладок при активированной консультации,
+                // временное решение:
+                // подгружать чат ДО того как начнется загрузка файла
+                $('[data-tab=chat]').click();
+                //тут отправка!
+                var messageBlock = $("#content_message_" + dataId);
+
+                //i`m__content_message
+                if (groupId == 3) {//селектор для автора
+                    messageData = getCurrentMessageData(messageBlock);
+                } else {//для заказчика
+                    messageData = getCurrentMessageData(fixMessageBlock);
+                }
+
+                messageData.filestatus = MessageUI.fileStatus;
+
+                // салздаем элемент контекста
+                var el = document.createElement('div');
+                var elClone = document.createElement('div');
+                var msgEl = document.createElement('div');
+
+                // форматирование
+                data.files = _.map(data.files, function (file) {
+                    file.readableSize = formatSize(file.size);
+                    file.readableType = file.name.split('.').pop();
+                    return file;
+                });
+
+                // 0 -- промежуточный, 1 -- оконсательный
+                var file = data.files[0];
+                file.status = messageData.filestatus;
+
+                // рендер шаблона
+                el.innerHTML = template(file);
+                elClone.innerHTML = template(file);
+                msgEl.innerHTML = messageTemplate(file);
+
+                // сохранение ссылки на контекст
+                data.context = el;
+                data.contextClone = elClone;
+                data.msgContext = msgEl;
+                var list = $('#commentlist_' + dataId + ' .scroll__wraper');
+                list.append(msgEl);
+
+                if ($('#customerFiles').length) $('#customerFiles [data-js=fileList]').append(el);
+                $('#orderFull__tabs-4 [data-js=fileList]').append(el);
+                $('.topic__attaches-orders [data-js=fileList]').append(elClone);
+
+                // Меняем количество файлов в названии вкладки
+                $('#orderFull__tabs .authorFiles.orderFull__tabs-black').html('(' + $('#orderFull__tabs-4 [data-js=fileList]').find('[data-js=fileItem]').length + ')');
+
+                $(el).on('click', '[data-hook-upload=remove]', function () {
+                    $(data.context).remove();
+                    data.abort();
+                    $(document).trigger('uploadedFilesUpdated');
+                });
+
+                $(document).scrollTop(list.closest('.block').offset().top - 70);
+
+                (function () {
+                    // при добавлении файла прокручиваем область сообщений и хендлер прокрутки вниз
+                    try {
+                        $('.scroll__wraper').animate({bottom: 0}, 250);
+                        $('.scroller .handle').animate({top: '100%'}, 250);
+                    } catch (e) {
+                    }
+                }());
+
+
+                setTimeout(function () {
+                    $(document).trigger('uploadedFilesUpdated');
+                }, 1000);
+
+                pasteFileHolder[dataId] = null;
+                var messageBlockInput = $("#content_message_" + dataId + ' [data-control=text]');
+                messageBlockInput.find('.im__content_file_item').remove();
+            }
+        });
+
+        fUpload.on('fileuploadadd', function(e, data) {
+            if (e.delegatedEvent.type == 'paste' || e.delegatedEvent.type == 'drop') {
+                var dataId = $(e.delegatedEvent.target).closest('.im__control').attr('data-id');
+                pasteFileHolder[dataId] = null;
+
+                if (data.files[0]['size'] <= A24.constant.maxFileSize) {
+                    var file = data.files[0];
+                    var fileName = file.name;
+                    var renderedItem = inputFileItemTemplate({
+                        fileName: fileName
+                    });
+
+                    var messageBlockInput = $("#content_message_" + dataId + ' [data-control=text]');
+
+                    setTimeout(function() {
+                        messageBlockInput.find('img').remove();
+                        messageBlockInput.find('.im__content_file_item').remove();
+                        messageBlockInput.find('span').remove();
+                        messageBlockInput.prepend(renderedItem);
+                        pasteFileHolder[dataId] = data;
+                    }, 0);
+                }
+            }
+        });
+
+        fUpload.on('fileuploaddone', function(e, data) {
+            var response = data.result;
+
+            // 0 -- ошибка, выводим сообщения и удаляем всю нагенерированую хурму
+            if (response.status == 0) {
+
+                $(data.context).remove();
+                $(data.contextClone).remove();
+                $(data.msgContext).remove();
+
+                if (groupId == 2) {
+                    showDefaultMessage($.i18n._('Произошла ошибка'), response.error);
+                } else {
+                    if ($('.fileupload').attr('data-stage-int') == 0) {
+                        showDefaultMessage($.i18n._('Произошла ошибка'), response.error);
+                    } else {
+                        $('#select_file .error').html(response.error);
+                    }
+                }
+                return;
+
+            } else {
+                MessageUI.popup.dialog('close');
+            }
+
+            $(data.context, data.contextClone).on('click', '[data-hook-upload=remove]', function(e) {
+                $(document).trigger('uploadedFilesUpdated');
+                e.preventDefault();
+                $.ajax({
+                    type: 'POST',
+                    url: '/ajax/deleteFile/' + response.fileInfo.fileHash,
+                    cache: false,
+                    dataType: 'json',
+                    error: function(error) {
+                        showDefaultMessage($.i18n._('Произошла ошибка'), $.i18n._('Произошла ошибка'));
+                    }
+                });
+            });
+
+            // https://jira.athr.ru/browse/AUTHORS-42:
+            // Кейс 5: Предпросмотр файлов игнорирует загруженный файл
+            // Решение: Добавить в дата атрибут виджета предпросмотра данные о файле
+            // Подсказка на будущее: Данные этого атрибута подхватываются реактовским компонентом,
+            // который инджектится сюда из репошки a24-client
+            try {
+                var datafiles = JSON.parse($('#preview-order-files').attr('data-files'));
+                var file = response.fileInfo;
+                datafiles.push({
+                    id: Date.now(),
+                    creation: file.fileDate,
+                    filehash: file.fileHash,
+                    filename: file.fileName,
+                    filesize: (file.fileSizeAtBytes / 1024 / 1024).toFixed(2),
+                    type: file.fileName.split('.').pop()
+                });
+                $('#preview-order-files').attr('data-files', JSON.stringify(datafiles));
+            } catch(e) {}
+
+            // обновляем ссылку на него
+            $(data.context).find('a').attr('href', '/file/' + response.fileInfo.fileHash);
+            $(data.context).find('[data-hook-upload]').attr('data-file', response.fileInfo.fileHash);
+            $(data.context).find('[data-fileHash]').val(response.fileInfo.fileHash);
+
+            $(data.contextClone).find('a').attr('href', '/file/' + response.fileInfo.fileHash);
+            $(data.contextClone).find('[data-hook-upload]').attr('data-file', response.fileInfo.fileHash);
+            $(data.contextClone).find('[data-fileHash]').val(response.fileInfo.fileHash);
+
+            // прячем прогрессбар и показываем дату загрузки файла
+            setTimeout(function() {
+                $(data.context).find('[data-hook-upload=progressContainer]').fadeOut(300, function() {
+                    $(data.context).find('[data-uploadDate]').text(response.fileInfo.fileDate).fadeIn();
+                });
+                $(data.contextClone).find('[data-hook-upload=progressContainer]').fadeOut(300, function() {
+                    $(data.contextClone).find('[data-uploadDate]').text(response.fileInfo.fileDate).fadeIn();
+                });
+            }, 500);
+
+            if (messageData.filestatus == 1 && /*!short_popup*/ groupId == 3) {
+                location.reload();
+            }
+            $(this).find($('#commentlist_' + messageData.order_id + ' .scroll__wraper')).append(waitMessage);
+            reloadMessageList(messageData.order_id, messageData.toAuthorId, true);
+            $(document).trigger('uploadedFilesUpdated');
+
+            $('.visible-inline').css({display: 'inline-block'});
+            // https://jira.athr.ru/browse/AUTHORS-42:
+            // Кейс 1. Блок с файлами автора открывается при каждой загрузке файла
+            // Решение: Закоментим эту строчку)0))
+            // $('.visible-block').css({display: 'block'});
+        });
+
+        fUpload.on('fileuploadfail', function(e, data) {
+            $(data.context).remove();
+            $(document).trigger('uploadedFilesUpdated');
+        });
+
+        $(".im__control div.im__control-textarea").on('change keyup', function() {
+            // если был дропнутый файл но его стёрли, то его отправлять больше не надо
+            var dataId = $(this).closest('.im__control').attr('data-id');
+            if (
+                pasteFileHolder[dataId] != null &&
+                $(this).find('.im__content_file_item').length == 0
+            ) {
+                pasteFileHolder[dataId] = null;
+            }
+        });
+    }
+
+});
+
+var gData;
+var isFileAdd = false;
+var messageList = [];
+var fileList = [];
+
+function reloadMessageList(order_id, user_id, resetCache) {
+    if (resetCache) {
+        cleanUnreadMessages(order_id);
+    }
+    A24.modules["orderslist"].actions["reload"](order_id, user_id, resetCache);
+}
+
+function cleanUnreadMessages( order_id ) {
+    $.ajax({ url: '/ajax/deleteunread/' + order_id });
+    $('.separator').empty();
+    $('div[data-id="' + order_id + '"]').find('.cpad')
+        .hide()
+        .html('+0');
+}
+
+function getCurrentMessageData(messageBlock) {
+    var messageData = {};
+    var controlText = messageBlock.find('[data-control=text]');
+
+    if (controlText.find('.im__content_file_item').length > 0) {
+        controlText = controlText.clone();
+        controlText.find('.im__content_file_item').remove();
+    }
+
+    if (controlText.val() !== '') {
+        messageData.message = controlText.val();
+    } else if (controlText[0]) {
+        messageData.message = controlText[0].innerText;
+    }
+
+    messageData.order_id = messageBlock.attr("data-id");
+
+    messageData.toAuthorId = messageBlock.find('.inputToAuthorId').val();
+
+    return messageData;
+}
+
+
+function setCurrentMessageData(messageData, messageBlock) {
+    messageBlock.children('div[data-control=text]').html(messageData.message);
+    //messageBlock.data("id", messageData.order_id);
+    messageBlock.attr("data-id", messageData.order_id);
+}
+
+function addMessageToList(order_id, message) {
+    messageList[order_id] = message;
+}
+
+function removeMessageFromList(order_id) {
+    if (typeof messageList[order_id] !== "undefined")
+    {
+        delete messageList[order_id];
+    }
+}
+
+
+function cleanCurrentMessageData(messageBlock)
+{
+    messageBlock.children('[data-control=text]').html('');
+    messageBlock.children('[data-control=text]').val('');
+}
+
+var createFileElement = function () {
+    $('body').append('<input data-js="fileupload" name="file0" type="file" style="display: none;">');
+    return $('[data-js="fileupload"]');
+};
+var ctrlEntenr = function () {
+    $('.im__control-textarea').keydown(function(event) {
+
+        var isEnter = event.keyCode == 13,
+            isCtrlWithEnter = event.ctrlKey && isEnter;
+
+        if ( isCtrlWithEnter ) {
+            event.preventDefault();
+            $(this).parent().find('.im__control-button').click();
+        }
+    });
+};

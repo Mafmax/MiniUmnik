@@ -1,0 +1,3 @@
+
+window[window["TiktokAnalyticsObject"]].instance("BSG1752HO5CA4NQ7AE90").setAdvancedMatchingAvailableProperties({"email":false,"phone_number":false});
+window[window["TiktokAnalyticsObject"]].instance("BSG1752HO5CA4NQ7AE90").setPixelInfo && window[window["TiktokAnalyticsObject"]].instance("BSG1752HO5CA4NQ7AE90").setPixelInfo({status: 0, name: "Author manual", advertiserID: "6854421589543354373", setupMode: 0, partner: ""});

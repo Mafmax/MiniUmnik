@@ -32,18 +32,18 @@ public class MathematicLevelDesigner : LevelDesigner
 
         if (currentLevel < 3)
         {
-            time = 8;
+            time = 18;
             answersCount = 8;
         }
         else if (currentLevel < 7)
         {
-            time = 9;
+            time = 19;
             answersCount = 6;
 
         }
         else if (answersCount <= 10)
         {
-            time = 9;
+            time = 19;
             answersCount = 4;
         }
         foreach (var answ in GetAnswers(answersCount, answerQuestion.Key))

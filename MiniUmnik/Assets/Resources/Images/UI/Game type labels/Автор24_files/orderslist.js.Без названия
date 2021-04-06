@@ -1,0 +1,192 @@
+// JavaScript Document
+
+A24.modules.orderslist = {
+
+    ajaxUrl: {
+        getComment: '/ajax/getMessageList'
+    },
+
+    init: function (module, action, id, target) {
+        A24.modules[module].actions[action](module, action, id, target);
+    },
+
+    actions: {
+        showcomment: function (module, action, id, target) {
+            var data = {order_id: id, start: 1, cnt: 20}
+
+            $.ajax({
+                url: '/ajax/getMessageList',
+                type: "POST",
+                data: data,
+                success: function (data) {
+                    A24.modules[module].out(module, action , id , $(target).parents('.orders__item').find('.im__content'),data);
+                    $(target).parents('.orders__item').find('.orders__item-im').toggle(400)
+                    if ($(target).hasClass('orders__item_bottom__messages') || $(target)[0].tagName === 'ATHR-COUNTER'){
+                        if ($(target).hasClass('orders__item_bottom__messages')) {
+                            $(target).removeClass('orders__item_bottom__messages').addClass('orders__item_top__messages')
+                        }
+
+                        $('.im__content_message.new_message:first').before('' + A24.templates['MessagesSeparator']);
+
+                        $.ajax({
+                            url : '/ajax/deleteUnread/' + id,
+                            type : 'POST',
+                            dataType: 'json',
+                            success : function(data) {
+                                $('.im__content_message').removeClass('new_message');
+                                A24.modules['messages'].actions['getUnreadNotificationCount']('messages', 'getUnreadNotificationCount', id);
+                            }
+                        });
+
+                    } else {
+                        $(target).removeClass('orders__item_top__messages').addClass('orders__item_bottom__messages');
+                    }
+                }
+            });
+
+        },
+
+        reload: function (order_id, user_id, resetCache) {
+            A24.modules['messages'].actions['get']('messages', 'get', order_id, null ,user_id, resetCache);
+        }
+    },
+
+    out: function (module, action, id, target, data) {
+        var dataL = data.length,
+            out = '';
+        target.find('.scroll__wraper').html(out);
+
+        var template = A24.templates['messages'];
+
+        out = A24.modules.messages.replacePlaceholderMessages(data,template,target);
+
+		var wraper =  target.find('.scroll__wraper');
+       
+        wraper.html(out);
+
+	   $(document).scrollTop(target.closest('.block').offset().top - 70);
+	   
+	   setTimeout( function() {
+           A24.scroller(target);
+       }, 0);
+
+        $("#content_message").attr("data-id", id);
+        $("#control_submitter").attr("data-id", id);
+        $("#control_fileupload").attr("data-id", id);
+    },
+
+    replacePlaceholderMessages: function(data,string){
+        outString = ''
+        for (var i in data){
+            out = string
+            if ($('#userData').data('userid') == data[i]['user_id'])
+                out = out.replace('{his}','my')
+            else
+                out = out.replace('{his}','his')
+            out = out.replace('{new}',data[i]['new'])
+            //out = out.replace('{user_id}',data[i]['user_id'])
+            out = out.replace('{avatar}',data[i]['avatar'])
+            out = out.replace('{nick_name}',data[i]['nick_name'])
+            if (data[i]['group_id'] == 2)
+                out = out.replace('{user_group}','Заказчик')
+            if (data[i]['group_id'] == 3)
+                out = out.replace('{user_group}','Автор')
+            text = data[i]['text']
+            if (data[i].filehash != null)
+                text += 'Файл: <a href="/file/' + data[i]['filehash'] + '">' + data[i]['filename'] + '</a>'
+            /*if (data.bid != null)
+                text += 'Ставка: ' + data[i]['bid']*/
+            out = out.replace('{text}',text)
+        
+            outString += out
+        }
+        return outString
+    }
+
+};
+
+$(function () {
+
+    // Избранные заказы
+    // http://jira.athr.ru/browse/WEB-4471
+
+    $(document).on('click', '[data-js="fav"]', function (ev) {
+        ev.preventDefault();
+
+        var isActive = $(ev.target).hasClass('active');
+        var id = $(ev.target).attr('rel');
+
+        $.ajax({
+            url: isActive ? ('/ajax/removeFavorite/' + id) : ('/ajax/addFavorite/' + id),
+            dataType: 'JSON',
+            type: 'POST',
+            success: function(){
+                $(ev.target)[isActive ? 'removeClass' : 'addClass']('active');
+            }
+        });
+    });
+
+});
+
+
+
+// nps рейтинг опрос о сервисе
+var mark = undefined;
+var comment = '';
+
+
+$(function() {
+    var gradeBoxList = $('.gradeBox');
+        gradeBoxList.on('click', function() {
+        gradeBoxList.removeClass('unactive');
+        gradeBoxList.removeClass('active');
+
+        gradeBoxList.addClass('unactive');
+        gradeBoxList.prop('disabled', 'disabled');
+        $(this).removeClass('unactive');
+        $(this).addClass('active');
+        mark =  $(this).attr('value');
+    })
+});
+
+// на анкету
+$(document).on('click',  '[data-js="npslink"]', function (ev) {
+    ev.preventDefault();
+    if (userType === 'oldAuthor') {
+        window.open(` https://www.survio.com/survey/d/U6C7Y2Q2R6R7V8O1Q?id=${userId}&nps=${mark}`, '_self');
+    } else if (userType === 'newbie') {
+        window.open(`https://www.survio.com/survey/d/D0R6L0N2L8K5H2X6V?id=${userId}&nps=${mark}`, '_self');
+    }
+});
+
+
+$('[data-js="nps-close"]').on('click',  function (ev) {
+    ev.preventDefault();
+    $.ajax({
+        url: '/ajax/closeNpsModal/',
+        type: 'POST',
+        success: function () {
+            $('.npsPopup').addClass('hideNPS');
+        }
+    });
+});
+
+
+$(document).on('click', '[data-js="npssend"]', function (ev) {
+    ev.preventDefault();
+    comment = $('[data-js="npscomment"]').val();
+    var data = {mark: mark, comment: comment};
+
+   (mark === undefined)
+       ? alert('Необходимо поставить оценку')
+       : $.ajax({
+            url: '/ajax/addNpsMark/',
+            type: 'POST',
+            data: data,
+            success: function(data){
+                console.log( "запрос успешно выполнился, а это данные, которые вернул сервер: " + data );
+                $('[data-js="step1"]').addClass('hideNPS');
+                $('[data-js="step2"]').removeClass('hideNPS');
+            }
+        })
+});

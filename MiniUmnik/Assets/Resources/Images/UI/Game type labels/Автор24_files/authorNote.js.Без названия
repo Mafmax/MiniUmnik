@@ -1,0 +1,59 @@
+$(function () {
+
+    var ui = {
+        tpl: $('[data-js="template-write-note"]').html(),
+        note: $('[data-js="note"]'),
+        noteBlock: $('[data-js="note-block"]'),
+        text: $('[data-js="note-text"]'),
+        author: $('[data-js="note-author"]'),
+        writeWrapper: $('[data-js="note-new-wrapper"]'),
+        writeBtn: $('[data-js="note-write"]'),
+        editBtn: $('[data-js="note-edit"]'),
+        saveBtn: $('[data-js="note-save"]')
+    };
+    var popup = new window.A24.popup({ subView: ui.tpl });
+    var showPopup = function (ev) {
+        ev.preventDefault();
+        var markup = $(popup.render());
+        markup.find('[data-js="note-text"]').html(ui.note.text().replace(/^\s+|\s+$/g, ''));
+        $(document.body).append(markup);
+        ui.text = $(ui.text.selector);
+    };
+
+    ui.writeBtn.on('click', showPopup);
+    ui.editBtn.on('click', showPopup);
+
+    $(document).on('click', ui.saveBtn.selector, function (ev) {
+        ev.preventDefault();
+        ui.saveBtn.attr('disabled', true);
+
+        var text = ui.text.val();
+
+        $.ajax({
+            method: 'post',
+            url: '/authors/ajaxSetAuthorNote',
+            data: {
+                author_id: ui.text.data('author'),
+                note: text
+            },
+            success: function () {
+                if (text.length) {
+                    ui.writeWrapper.hide();
+                    ui.editBtn.css({ display: 'inline-block' });
+                    ui.note.text(text);
+                    ui.noteBlock.show();
+                } else {
+                    ui.noteBlock.hide();
+                    ui.editBtn.hide();
+                    ui.note.text('');
+                    ui.writeWrapper.css({ display: 'inline-block' });
+                }
+                popup.close();
+            },
+            error: function (res) {
+                console.warn(res.responseJSON.msg);
+            }
+        });
+    });
+
+});

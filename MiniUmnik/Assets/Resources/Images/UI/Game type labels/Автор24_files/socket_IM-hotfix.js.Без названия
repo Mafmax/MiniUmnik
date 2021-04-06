@@ -1,0 +1,90 @@
+// чтоб чат с сокетами работал
+// принимает только текстовые сообщения
+
+$(function () {
+
+    window.vent.on('socketEvents', function (data) {
+        processingAndShowEvent(data);
+    });
+
+    var messages = function() {};
+
+    messages.wraper = $('#io_messages');
+    messages.itemHtml = $('<div class="io_message"><span class="io_message__close"></span></div>');
+
+    var tick;
+    function timer(messageItem) {
+        var sec = 1;
+        // через 10 секунд убираем подсказку
+        tick = setInterval(function() {
+            if(sec == 10) {
+                messageItem.remove();
+            }
+            sec++;
+        }, 10000);
+    }
+
+    function processingAndShowEvent(dataObject) {
+
+        if (!dataObject) {
+            A24.errorLogger({comment:'socket processingAndShowEvent'});
+        }
+
+        if (dataObject.type == 'message') {
+            if (dataObject.message != '') {
+                if ($('#commentlist_' + dataObject.orderId).length) {
+                    console.log('get');
+                    A24.modules['messages'].actions['get'](
+                        'messages',
+                        'get',
+                        dataObject.orderId,
+                        undefined,
+                        dataObject.groupId == 3 ? dataObject.userId : null, //если написал Автор - заказчику говорим какой. Иначе не передаем
+                        true
+                    );
+                }
+
+                if (typeof currentOrderId === 'undefined') {
+                    currentOrderId = 0;
+                }
+
+                if (dataObject.orderId === undefined || dataObject.orderId === 'undefined') {
+                    A24.errorLogger({comment:'socket 1', data: dataObject});
+                }
+
+                if (currentOrderId != dataObject.orderId) {
+                    var  messageItem = messages.itemHtml.clone()
+                        .append('<div class="io_message__name">'+dataObject.name+'</div>')
+                        .append(dataObject.message.replace((new RegExp("\n", 'g')), '<br />'))
+                        .click(function() {
+                            var userId = dataObject.userId || false;
+                            if( userId ){
+                                location.href = '/order/getoneorder/'+dataObject.orderId+'?openDialog='+dataObject.userId;
+                            }
+                            else{
+                                location.href = '/order/getoneorder/'+dataObject.orderId;
+                            }
+                        });
+                    messages.wraper.append(messageItem.addClass('slideUp'));
+                    messageItem.find('.io_message__close').click(function() {
+                        messageItem.remove();
+                    });
+
+                    timer(messageItem);
+                }
+
+                $('#unreadMessageCnt_' + dataObject.orderId).html('+' + dataObject.countUnreadMessageByOrderId);
+
+            }
+        }
+
+        if (dataObject.type == 'hasRead') {
+            if (dataObject.countUnreadMessageByOrderId) {
+                $('#unreadMessageCnt_' + dataObject.orderId).html('+' + dataObject.countUnreadMessageByOrderId);
+            // } else {
+            //     $('#unreadMessageCnt_' + dataObject.orderId).parent().hide();
+            }
+        }
+    }
+
+});

@@ -1,0 +1,56 @@
+// JavaScript Document
+
+A24.modules.notice = {
+
+    ajaxUrl: {
+        get: '/ajax/getMessageCntInfoByOrderId',
+        getById: '/ajax/getMessageCntInfoByOrderId',
+        getByIdUnread: '/ajax/getUnreadMessageListByOrderId',
+        clean: '/ajax/cleanAllUnreadMessageByOrderId',
+        cleanById: '/ajax/cleanAllUnreadMessageByOrderId'
+    },
+
+    init: function (module, action, id, target) {
+        A24.modules[module].actions[action](module, action, id, target);
+    },
+
+    actions: {
+        more: function (module, action, id, target) {
+        },
+        pusher: function () {
+        },
+        update: function () {
+        },
+        get: function () {
+        }
+    },
+
+    out: function (module, action, id, target, data) {
+
+        var dataL = data.length,
+            out = '';
+
+        for (var i in data) {
+            var template = A24.templates[module];
+            for (var i2 in data[i]) {
+                template = template.replace('{' + i2 + '}', data[i][i2]);
+            }
+            out = out + template;
+        }
+
+        if (action == 'get') {
+            target.html(out);
+        }
+        else {
+            target.append(out);
+        }
+        ;
+
+    }
+
+}
+
+
+	
+
+

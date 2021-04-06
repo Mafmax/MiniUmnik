@@ -1,0 +1,195 @@
+// JavaScript Document
+
+A24.modules.recommended = {
+
+    ajaxUrl: {
+        remove: '/ajax/cleanRecommendOrder',
+        get: '/ajax/getRecommendOrderList'
+    },
+
+    count: 3,//кол-во обычных заказов
+    count_premium:1,//кол-во премиум заказов
+    start_premium:1,//оффсет для премиум заказаи (единица потом вычтется на стороне сервера, хз зачем так было изначально написано)
+    start:1,//оффсет для обычного заказа (единица потом вычтется на стороне сервера, хз зачем так было изначально написано)
+    cnt_pages :1,//текущая страница
+    cnt_orders:0,//кол-во убранных заказов (пока премиумов)
+
+
+    init: function (module, action, id, target) {
+        A24.modules[module].actions[action](module, action, id, target);
+    },
+
+    actions: {
+        remove: function (module, action, id, target) {
+
+            var data = {order_id: id};
+
+            $.ajax({
+                url: '/ajax/cleanRecommendOrder',
+                type: "POST",
+                data: data,
+                success: function (data) {
+
+                    if (data == 'ok') {
+                        //высчитываем офсет
+                        //если есть премиум заказ
+                        if($('.recommended .order-content__block--premium').length > 0){
+                            var start = (A24.modules.recommended.count) * A24.modules.recommended.cnt_pages - 1;
+                        } else {
+                           //если нет премиум заказа вверху
+                            var start = (A24.modules.recommended.count+A24.modules.recommended.count_premium) * A24.modules.recommended.cnt_pages - 1 ;
+                        }
+
+
+                        var data = {start: start, cnt: 1};
+                        $.ajax({
+                            url: '/ajax/getRecommendOrderList',
+                            type: "POST",
+                            data: data,
+                            success: function (data) {
+                                dir = target.parent();
+                                A24.modules[module].out(module, action, id, dir, data);
+                                target.remove();
+                            },
+                            dataType: 'json'
+                        });
+                    }
+
+                },
+                dataType: 'json'
+            });
+
+
+        },
+        remove_premium: function (module, action, id, target){
+            var data = {order_id: id,premium:true};
+            $.ajax({
+                url: '/ajax/cleanRecommendOrder',
+                type: "POST",
+                data: data,
+                success: function (data) {
+
+                    if (data == 'ok') {
+                        var start_premium = A24.modules.recommended.start_premium++;
+                        //кол-во убранных премиум заказов, для подстета офсета, если будет нажата кнопка показать еще
+                        A24.modules.recommended.cnt_orders++;
+
+                        var count_simple_orders = (A24.modules.recommended.count * A24.modules.recommended.cnt_pages);
+                        var data = {start_premium: start_premium, cnt: 1, premium:true, count_simple_orders:count_simple_orders};
+                        $.ajax({
+                            url: '/ajax/getRecommendOrderList',
+                            type: "POST",
+                            data: data,
+                            success: function (data) {
+                                dir = target.parent();
+                                A24.modules[module].out(module, action, id, dir, data);
+                                target.remove();
+                            },
+                            dataType: 'json'
+                        });
+                    }
+
+                },
+                dataType: 'json'
+            });
+
+        },
+        more: function (module, action, id, target) {
+
+            var dir = target.parent().find('[data-control=wraper]');
+
+            //если есть блок с премиум заказом
+            if($('.recommended .order-content__block--premium').length > 0){
+                //увеличиваем "постраничность"
+                A24.modules.recommended.cnt_pages++;
+                //рассчитывает офсет
+                A24.modules.recommended.start = (A24.modules.recommended.cnt_pages -1) *  A24.modules.recommended.count ;
+                var start =   A24.modules.recommended.start;
+                var count =  A24.modules.recommended.count;
+
+            } else {
+                //если премиумов нет
+               var count =  A24.modules.recommended.count + A24.modules.recommended.count_premium ;
+                A24.modules.recommended.cnt_pages++;
+
+                var start  = (A24.modules.recommended.count + A24.modules.recommended.count_premium) * (A24.modules.recommended.cnt_pages-1) - A24.modules.recommended.cnt_orders;
+                //console.log(start,A24.modules.recommended.cnt_orders);
+            }
+
+            var data = {start: start, cnt: count};
+
+            $.ajax({
+                url: '/ajax/getRecommendOrderList',
+                type: "POST",
+                data: data,
+                success: function (data) {
+                    A24.modules[module].out(module, action, id, dir, data);
+                },
+                dataType: 'json'
+            });
+
+
+        },
+        pusher: function () {
+        }
+    },
+
+    out: function (module, action, id, target, data) {
+
+        var dataL = data.length,
+            out = '';
+
+        for (var i in data) {
+            var template = A24.templates[module];
+            if (data[i]['order_id'] === undefined || data[i]['order_id'] === 'undefined') {
+                A24.errorLogger({comment:'recommended 2', data: data[i]});
+            }
+            //это писец костыли.
+            for (var i2 in data[i]) {
+                if( i2  == 'premium'){
+                    if(data[i]['premium'] == true){
+                        template = template.replace(new RegExp('{' + 'premium' + '}', 'g'), 'order-content__block--premium');
+                        template = template.replace(new RegExp('{' + 'remove' + '}', 'g'), 'remove_premium');
+                    } else {
+                        template = template.replace(new RegExp('{' + 'premium' + '}', 'g'), '');
+                        template = template.replace(new RegExp('{' + 'remove' + '}', 'g'), 'remove');
+                    }
+                } else {
+                    template = template.replace(new RegExp('{' + i2 + '}', 'g'), data[i][i2]);
+                }
+            }
+            out = out + template;
+        }
+
+        if (data[1]) {
+            //если есть премиум, его удалять не надо
+            if($('.recommended .order-content__block--premium').length > 0){
+                target.parent().find('[data-control=wraper] .recommended__item').not('.recommended__item:first').remove();
+                target.append(out);
+            } else {
+                target.html(out);
+            }
+        }
+        else {
+
+            if(data[0] !== undefined) {
+                var isPremium = data[0].premium;
+                if (isPremium) {
+                    //добавляем как первый элемент
+                    target.prepend(out);
+                } else {
+                   if(action == 'more' ){
+                       target.html(out);
+                   } else {
+                       target.append(out);
+                   }
+                }
+            }
+        }
+    }
+
+}
+
+
+
+

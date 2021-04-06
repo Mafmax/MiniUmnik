@@ -187,15 +187,15 @@ public class LogicLevelDesigner : LevelDesigner
 
         if (currentLevel < 4)
         {
-            time = 15;
+            time = 45;
         }
         else if (currentLevel < 8)
         {
-            time = 12;
+            time = 40;
         }
         else
         {
-            time = 10;
+            time = 35;
         }
 
 

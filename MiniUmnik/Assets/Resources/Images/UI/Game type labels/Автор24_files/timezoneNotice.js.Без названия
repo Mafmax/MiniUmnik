@@ -1,0 +1,38 @@
+$(function () {
+    var $notice = $(
+        '<div class="m-notice">' +
+            '<div class="m-notice__content" data-js="timezone-text">' +
+                $.i18n._('Часовой пояс в настройках аккаунта отличен от часового пояса вашего устройства. Нажмите <a href="#" data-js="timezone-change">здесь</a> чтобы применить новый часовой пояс.') +
+            '</div>' +
+            '<a href="#" class="m-notice__closeCross" data-js="timezone-close"></a>' +
+        '</div>'
+    );
+    var setTimezone = function (tz, cb) {
+        cb = cb || function () {};
+        $.ajax({
+            url: '/ajax/setDefaultUserTimeZone',
+            method: 'post',
+            data: { timezone: tz },
+            success: cb
+        });
+    };
+    var localOffset = (new Date).getTimezoneOffset() * -60;
+    $notice.on('click', '[data-js="timezone-close"]', function (e) {
+        e.preventDefault();
+        $notice.hide();
+        $.get('/ajax/closeTimeZonePopUp');
+    });
+    $notice.on('click', '[data-js="timezone-change"]', function (e) {
+        e.preventDefault();
+        setTimezone(moment.tz.guess(), function () {
+            $notice.find('[data-js="timezone-text"]').html($.i18n._('Часовой пояс изменен на "' + moment.tz.guess() + '"'));
+        });
+        setTimeout(function () { $notice.hide() }, 5000);
+    });
+    $('body').append($notice);
+    if (!userTimezone.length) {
+        setTimezone(moment.tz.guess());
+    } else if (userTimeZoneOffset != localOffset && !userClosedTimeZoneWarning) {
+        $notice.show();
+    }
+});

@@ -1,0 +1,52 @@
+defaultPopupDivId = 'defaultPopup';
+var defaultElement = '';
+
+var showDefaultMessage = function (title, error) {
+    if (defaultElement === '') {
+        defaultElement = $('#' + defaultPopupDivId);
+    }
+
+    defaultElement.dialog({ title:title, open: function() {
+        $(this).html(error);
+    }});
+
+    defaultElement.dialog('open');
+};
+
+$(document).ready(function(){
+    var defaultPopupDiv = document.createElement('div');
+
+
+    defaultPopupDiv.id = defaultPopupDivId;
+    document.body.appendChild(defaultPopupDiv);
+
+    var defaultPopupDialog = $('#' + defaultPopupDivId);
+
+    try {
+        defaultPopupDialog.dialog({
+            draggable: false,
+            width: 695,
+            autoOpen: false,
+            title: $.i18n._("Подтверждение"),
+            modal: true,
+            buttons: [{
+                text: $.i18n._('Ок'),
+                'class': 'green',
+                click: function() {
+                    $(this).dialog('close');
+                }
+            }]
+        });
+
+    } catch (e) {
+        console.log(e);
+    }
+
+    $('#closeLimitPopup').click(function(){
+        $.post('/ajax/hideLimitPopup'
+        ).done(function(data) {
+            $('#limitPopup').hide();
+        }).fail(function() {
+        });
+    });
+});
