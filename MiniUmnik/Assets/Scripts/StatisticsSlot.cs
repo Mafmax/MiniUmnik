@@ -34,5 +34,8 @@ public class StatisticsSlot : MonoBehaviour
     void Update()
     {
 
+#if UNITY_WEBGL
+
+#endif
     }
 }
